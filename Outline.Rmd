@@ -1,0 +1,9 @@
+---
+title: "Temporal-Spatial and Functional Data Analysis Models for Yield Monitor Data"
+author: "Peter Claussen"
+date: "6/11/2020"
+output: html_document
+---
+
+# Project Outline
+

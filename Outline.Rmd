@@ -7,3 +7,52 @@ output: html_document
 
 # Project Outline
 
+# The Promise of Precision Agriculture
+
+Consider a classical model for crop yield with regard to agronomic or environmental inputs,
+
+$$
+Y = f(\beta,u)
+$$
+
+where $Y$ is some measure of yield - total bushels, or average bushels per acre, from a single field managed as a single unit. We denote inputs that can be controlled by the farmer - choice of seed variety, fertilizer rate, etc. as fixed effects $\beta$, and denote effects such as cumulative rainfall or growing degree days as the random component $u$. 
+
+Precision agriculture divides a field (in the agronomic sense) into a field (in the mathematical sense). Instead of managing inputs and estimating output on a per field basis, we consider each part of the field as an independent entity. We write
+
+$$
+Y_{A \times A} = f(\beta_{A \times A},u_{A \times A})
+$$
+where ${A \times A}$ identifies a discrete subdivision within the field.
+
+However, to define *Precision* in the context of agriculture, we must also be able to define *error*, so we write
+
+$$
+\mathbf{Y}_{A \times A} = f(\mathbf{\beta}_{A \times A},\mathbf{u}_{A \times A}) + \mathbf{e}_{A \times A}
+$$
+
+This project will attempt to describe the nature of the error $\mathbf{e}_{A \times A}$, with regard to three key aspects of statistical analysis:
+
+1. **Estimation**. We collect areal estimates of yield using sensor-equipped combine harvesters; GPS coordinates are associated with each yield estimate. How accurate are these estimates, with regard to mass per unit area, and with regard to exact geospatial position?
+
+2. **Inference**. We hope to understand the degree to which a specific agronomic input $\beta_i, _{A \times A}$ exerts a causal influence on observed yield $\mathbf{Y}_{A \times A}$ and judge the effectiveness of the agronomic input.
+
+3. **Prediction**. How well can we predict the effect of specific agronomic inputs $\mathbf{\beta}_{A \times A}$ on some future and to be measured yield $\mathbf{Y}_{A \times A}$, given the unknown random environmental effects $\mathbf{u}_{A \times A}$?
+
+
+# Appendix
+
+Other ideas and notes, in progress
+
+#### Prescriptions
+
+Using past history, measured on a very fine scale, to dictate agronomic practices on a fine scale - seeding rate, fertilizer needs, crop protetionc.
+
+#### Participatory Research
+
+#### Data Sources
+
+#### GPS-enabled Machinery
+
+#### Scouting data
+
+#### GIS layers

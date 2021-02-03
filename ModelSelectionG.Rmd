@@ -1,0 +1,334 @@
+---
+title: "Overview"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+#theme_set(theme_dag())
+#since we have k-fold cross validation
+
+set.seed(1000)
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+
+library(mgcv)
+library(splines)
+
+#library(ape)
+
+grey <- "#999999"
+orange <- "#E69F00"
+skyblue <- "#56B4E9"
+bluishgreen <- "#009E73"
+yellow <- "#F0E442"
+blue <- "#0072B2"
+vermillion <- "#D55E00"
+  
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#F0E442","#CC79A7","#000000","#734f80", "#2b5a74", "#004f39", "#787221", "#003959", "#6aaf00", "#663cd3")
+
+
+source('./R/remove.harvest.outliers.fn.R')
+source('./R/spatial.model.selection.R')
+source('./R/select.best.variogram.R')
+source('./R/spatial.selection.plots.R')
+source('./R/read.yield.data.R')
+```
+
+
+
+## Load Data
+
+
+```{r,eval=TRUE,echo=FALSE}
+field = 'G'
+root = '../ManagementZoneML/data/'
+
+harvest.2018.dat <- read.yield.data(root,field,2018,'Soybeans')
+harvest.2017.dat <- read.yield.data(root,field,2017,'Corn')
+harvest.2016.dat <- read.yield.data(root,field,2016,'Soybeans')
+harvest.2015.dat <- read.yield.data(root,field,2015,'Corn')
+harvest.2014.dat <- read.yield.data(root,field,2014,'Soybeans')
+harvest.2013.dat <- read.yield.data(root,field,2013,'Corn')
+
+#harvest.2013.dat <- read.csv(file='../ManagementZoneML/data/G 2013 Corn Harvest.csv')
+#harvest.2014.dat <- read.csv(file='../ManagementZoneML/data/G 2014 Soybeans Harvest.csv')
+#harvest.2015.dat <- read.csv(file='../ManagementZoneML/data/G 2015 Corn Harvest.csv')
+#harvest.2016.dat <- read.csv(file='../ManagementZoneML/data/G 2016 Soybeans Harvest.csv')
+#harvest.2017.dat <- read.csv(file='../ManagementZoneML/data/G 2017 Corn Harvest.csv')
+#harvest.2018.dat <- read.csv(file='../ManagementZoneML/data/G 2018 Soybeans Harvest.csv')
+#harvest.2019.dat <- read.csv(file='../ManagementZoneML/data/G 2019 Corn Harvest.csv')
+
+#harvest.2019.dat <- remove.harvest.outliers.fn(harvest.2019.dat)
+#harvest.2018.dat <- remove.harvest.outliers.fn(harvest.2018.dat)
+#harvest.2017.dat <- remove.harvest.outliers.fn(harvest.2017.dat)
+#harvest.2016.dat <- remove.harvest.outliers.fn(harvest.2016.dat)
+#harvest.2015.dat <- remove.harvest.outliers.fn(harvest.2015.dat)
+#harvest.2014.dat <- remove.harvest.outliers.fn(harvest.2014.dat)
+#harvest.2013.dat <- remove.harvest.outliers.fn(harvest.2013.dat)
+```
+
+
+```{r,fig.width=8,fig.height=4.5,echo=FALSE}
+Maps6 <- data.frame(Longitude=c(#harvest.2019.dat$Longitude,
+                                harvest.2018.dat$Longitude,
+                                harvest.2017.dat$Longitude,
+                                harvest.2016.dat$Longitude,
+                                harvest.2015.dat$Longitude,
+                                harvest.2014.dat$Longitude,
+                                harvest.2013.dat$Longitude),
+                   Latitude=c(#harvest.2019.dat$Latitude,
+                              harvest.2018.dat$Latitude,
+                              harvest.2017.dat$Latitude,
+                              harvest.2016.dat$Latitude,
+                              harvest.2015.dat$Latitude,
+                              harvest.2014.dat$Latitude,
+                              harvest.2013.dat$Latitude),
+                   Value=c(#rank(harvest.2019.dat$Yield)/max(rank(harvest.2019.dat$Yield)),
+                           rank(harvest.2018.dat$Yield)/max(rank(harvest.2018.dat$Yield)),
+                           rank(harvest.2017.dat$Yield)/max(rank(harvest.2017.dat$Yield)),
+                           rank(harvest.2016.dat$Yield)/max(rank(harvest.2016.dat$Yield)),
+                           rank(harvest.2015.dat$Yield)/max(rank(harvest.2015.dat$Yield)),
+                           rank(harvest.2014.dat$Yield)/max(rank(harvest.2014.dat$Yield)),
+                           rank(harvest.2013.dat$Yield)/max(rank(harvest.2013.dat$Yield))),
+                   Map=c(#rep(2019,length(harvest.2019.dat$Yield)),
+                         rep(2018,length(harvest.2018.dat$Yield)),
+                         rep(2017,length(harvest.2017.dat$Yield)),
+                         rep(2016,length(harvest.2016.dat$Yield)),
+                         rep(2015,length(harvest.2015.dat$Yield)),
+                         rep(2014,length(harvest.2014.dat$Yield)),
+                         rep(2013,length(harvest.2013.dat$Yield))))
+ggplot(Maps6, aes(Longitude,Latitude)) + 
+geom_point(aes(colour = Value),size=.5) + 
+scale_colour_gradient2(low=vermillion, mid=yellow, high=blue, midpoint = 0.5) +
+labs(colour = "Relative Rank", x="Easting", y="Northing", title = "Multiple Years") + facet_wrap(~ Map)
+```
+
+
+# Model Selection
+
+## ns
+
+```{r}
+models=12
+m='ns'
+range=c(3,35)
+#m='bs'
+#range=c(3,35)
+#m='gam'
+#range=c(4,300)
+#m='te'
+#range=c(2,24)
+#m='tp'
+#range=c(2,24)
+#m='re'
+#range=c(2,9)
+#m='lm'
+#range=c(4,14)
+```
+
+
+## 2018
+
+```{r}
+#par(mfrow=c(2,2))
+#Models.2018 <- spatial.model.selection(harvest.2018.dat)
+Models.2018 <- spatial.model.selection(harvest.2018.dat,range=range,method=m,models=models)
+Models.2018.plots <- spatial.selection.plots(Models.2018)
+```
+
+```{r}
+print(Models.2018.plots)
+```
+
+```{r}
+#Models.2018$Slopes
+summary(lm(Gamma ~ 0 + K + K:Distance,data=Models.2018$ResidualsData))
+```
+
+## 2017
+
+```{r}
+#par(mfrow=c(2,2))
+#Models.2017 <- spatial.model.selection(harvest.2017.dat)
+Models.2017 <- spatial.model.selection(harvest.2017.dat,range=range,method=m,models=models)
+Models.2017.plots <- spatial.selection.plots(Models.2017)
+```
+
+```{r}
+print(Models.2017.plots)
+```
+
+```{r}
+#Models.2017$Slopes
+summary(lm(Gamma ~ 0 + K + K:Distance,data=Models.2017$ResidualsData))
+```
+
+
+## 2016
+
+```{r}
+#par(mfrow=c(2,2))
+#Models.2017 <- spatial.model.selection(harvest.2017.dat)
+Models.2016 <- spatial.model.selection(harvest.2016.dat,range=range,method=m,models=models)
+Models.2016.plots <- spatial.selection.plots(Models.2016)
+```
+
+```{r}
+print(Models.2016.plots)
+```
+
+
+```{r}
+#Models.2016$Slopes
+summary(lm(Gamma ~ 0 + K + K:Distance,data=Models.2016$ResidualsData))
+```
+
+## 2015
+
+```{r}
+#par(mfrow=c(2,2))
+#Models.2015 <- spatial.model.selection(harvest.2015.dat)
+Models.2015 <- spatial.model.selection(harvest.2015.dat,range=range,method=m,models=models)
+Models.2015.plots <- spatial.selection.plots(Models.2015)
+```
+
+```{r}
+print(Models.2015.plots$Selection)
+print(Models.2015.plots$Variogram)
+print(Models.2015.plots$Residuals)
+print(Models.2015.plots$ResidualsLM)
+```
+
+```{r}
+#Models.2015$Slopes
+summary(lm(Gamma ~ 0 + K + K:Distance,data=Models.2015$ResidualsData))
+```
+
+## 2014
+
+```{r,eval=FALSE}
+#par(mfrow=c(2,2))
+#Models.2014 <- spatial.model.selection(harvest.2014.dat)
+Models.2014 <- spatial.model.selection(harvest.2014.dat,range=range,method=m,models=models)
+Models.2014.plots <- spatial.selection.plots(Models.2014)
+
+print(Models.2014.plots$Selection)
+print(Models.2014.plots$Variogram)
+print(Models.2014.plots$Residuals)
+print(Models.2014.plots$ResidualsLM)
+```
+
+## 2013
+
+```{r}
+#par(mfrow=c(2,2))
+#Models.2013 <- spatial.model.selection(harvest.2013.dat)
+Models.2013 <- spatial.model.selection(harvest.2013.dat,range=range,method=m)
+Models.2013.plots <- spatial.selection.plots(Models.2013)
+```
+
+```{r}
+print(Models.2013.plots$Selection)
+print(Models.2013.plots$Variogram)
+print(Models.2013.plots$Residuals)
+print(Models.2013.plots$ResidualsLM)
+```
+
+```{r}
+#Models.2013$Slopes
+summary(lm(Gamma ~ 0 + K + K:Distance,data=Models.2013$ResidualsData))
+```
+
+```{r}
+SelectionG <- Models.2018$Selection
+SelectionG$Year <- 2018
+
+tmp <- Models.2017$Selection
+tmp$Year <- 2017
+SelectionG <- rbind(SelectionG,tmp)
+
+tmp <- Models.2016$Selection
+tmp$Year <- 2016
+SelectionG <- rbind(SelectionG,tmp)
+
+tmp <- Models.2015$Selection
+tmp$Year <- 2015
+SelectionG <- rbind(SelectionG,tmp)
+
+#tmp <- Models.2014$Selection
+#tmp$Year <- 2014
+#SelectionG <- rbind(SelectionG,tmp)
+
+tmp <- Models.2013$Selection
+tmp$Year <- 2013
+SelectionG <- rbind(SelectionG,tmp)
+
+
+BestBICG <- select.best.variogram(Models.2018)
+BestBICG$Year <- 2018
+
+tmp <- select.best.variogram(Models.2016)
+tmp$Year <- 2016
+BestBICG <- rbind(BestBICG,tmp)
+
+tmp <- select.best.variogram(Models.2017)
+tmp$Year <- 2017
+BestBICG <- rbind(BestBICG,tmp)
+
+#tmp <- select.best.variogram(Models.2019)
+#tmp$Year <- 2019
+#BestBICG <- rbind(BestBICG,tmp)
+
+tmp <- select.best.variogram(Models.2015)
+tmp$Year <- 2015
+BestBICG <- rbind(BestBICG,tmp)
+
+#tmp <- select.best.variogram(Models.2014)
+#tmp$Year <- 2014
+#BestBICG <- rbind(BestBICG,tmp)
+
+tmp <- select.best.variogram(Models.2013)
+tmp$Year <- 2013
+BestBICG <- rbind(BestBICG,tmp)
+```
+
+```{r,echo=FALSE,fig.width=6,fig.height=4}
+BestBICG$Year <- factor(BestBICG$Year)
+ggplot(BestBICG, aes(Distance,Gamma)) + 
+geom_point(aes(colour = Year),size=2) + 
+   geom_smooth(aes(group = Year,color=Year),
+              se=FALSE) +
+ scale_colour_manual(values=c(cbPalette)) + facet_wrap(~Source)
+```
+
+```{r,echo=FALSE}
+Distance.dat <- data.frame(Distance = c(harvest.2018.dat$DISTANCE,
+                                        harvest.2017.dat$DISTANCE,
+                                        harvest.2016.dat$DISTANCE,
+                                        harvest.2015.dat$DISTANCE,
+                                        harvest.2013.dat$DISTANCE),
+                           Sample = c(1:length(harvest.2018.dat$DISTANCE),
+                                      1:length(harvest.2017.dat$DISTANCE),
+                                      1:length(harvest.2016.dat$DISTANCE),
+                                      1:length(harvest.2015.dat$DISTANCE),
+                                      1:length(harvest.2013.dat$DISTANCE)),
+                           Year = factor(c(rep(2018,length(harvest.2018.dat$DISTANCE)),
+                                      rep(2017,length(harvest.2017.dat$DISTANCE)),
+                                      rep(2016,length(harvest.2016.dat$DISTANCE)),
+                                      rep(2015,length(harvest.2015.dat$DISTANCE)),
+                                      rep(2013,length(harvest.2013.dat$DISTANCE)))))
+```
+
+```{r,echo=FALSE,fig.width=6,fig.height=3}
+ggplot(Distance.dat, aes(Sample,Distance)) + 
+geom_point(aes(colour = Year),size=.2) + 
+ scale_colour_manual(values=c(cbPalette))
+aggregate(Distance ~ Year,Distance.dat,FUN=sd)
+```
+
+```{r}
+save(BestBICG,file=paste('BestBIC.G.',m,'.Rda',sep=''))
+save(SelectionG,file=paste('Selection.G',m,'Rda',sep=''))
+```

@@ -7,3 +7,87 @@ output: html_document
 
 # Project Outline
 
+# The Promise of Precision Agriculture
+
+Consider a classical model for crop yield with regard to agronomic or environmental inputs,
+
+$$
+Y = f(\beta,u)
+$$
+
+where $Y$ is some measure of yield - total bushels, or average bushels per acre, from a single field managed as a single unit. We denote inputs that can be controlled by the farmer - choice of seed variety, fertilizer rate, etc. as fixed effects $\beta$, and denote effects such as cumulative rainfall or growing degree days as the random component $u$. 
+
+Precision agriculture divides a field (in the agronomic sense) into a field (in the mathematical sense). Instead of managing inputs and estimating output on a per field basis, we consider each part of the field as an independent entity. We write
+
+$$
+Y_{A \times A} = f(\beta_{A \times A},u_{A \times A})
+$$
+where ${A \times A}$ identifies a discrete subdivision within the field.
+
+However, to define *Precision* in the context of agriculture, we must also be able to define *error*, so we write
+
+$$
+\mathbf{Y}_{A \times A} = f(\mathbf{\beta}_{A \times A},\mathbf{u}_{A \times A}) + \mathbf{e}_{A \times A}
+$$
+
+This project will attempt to describe the nature of the error $\mathbf{e}_{A \times A}$, with regard to three key aspects of statistical analysis:
+
+1. **Estimation**. We collect areal estimates of yield using sensor-equipped combine harvesters; GPS coordinates are associated with each yield estimate. How accurate are these estimates, with regard to mass per unit area, and with regard to exact geospatial position?
+
+2. **Inference**. We hope to understand the degree to which a specific agronomic input $\beta_i, _{A \times A}$ exerts a causal influence on observed yield $\mathbf{Y}_{A \times A}$ and judge the effectiveness of the agronomic input.
+
+3. **Prediction**. How well can we predict the effect of specific agronomic inputs $\mathbf{\beta}_{A \times A}$ on some future and to be measured yield $\mathbf{Y}_{A \times A}$, given the unknown random environmental effects $\mathbf{u}_{A \times A}$?
+
+## Example 1.
+
+In ["What do we mean when we say 'p-value"](./ASA2019.pdf) portions of a field were treated with fungicide and portions were untreated. We *estimate*, using a spatial surface trend model, an increase of 2.5 bu/acre on the treated portions relative to untreated
+
+$$
+\widehat{\beta}_{trt} - \widehat{\beta}_{check} = 2.5
+$$
+
+To make the inference that the treatment caused the increase, we might wish to test
+
+$$
+H_0 : \widehat{\beta}_{trt} - \widehat{\beta}_{check} \ne 0
+$$
+We do not, however, have enough information from this experiment to *predict* if fungicide application on future crops will yield a similar increase.
+
+# Fixed Effects
+
+Where we develop $\beta_{A \times A}$ - variety selection, seeding rate, fertilizer application rate. We may include as fixed effects those geographical features that arise from random processes (soil types) but do not vary from year to year.
+
+# Random Effects
+
+Where we develop $u_{A \times A}$ - rainfall, temperature and interactions among fixed and random effects (i.e. interaction between accumulated rain totals and topography).
+
+# Residual Errors
+
+Where we develop $\mathbf{e}_{A \times A}$
+
+## Anisotropy
+
+We assume that spatial errors are similar in all directions - there is not directionality to the error processes (directional effects should be incorporated into the random effects component). We describe this as isotropic. When there is directional conditioning, we say the errors are anisotropic. 
+
+Some of the structure of the error may arise due to misplacement of GPS coordinates; there is a lag between sampling and measurement. We may be able to use local measures of isotropy to guide realignment (functional data methods, perhaps) to reduce anisotropy. 
+
+Briefly, we divide the field into small zones and measure isotropy in zone, modelling spatial correlation as an ellipse. We try to find an alignment that reduces each ellipse to a more circular shape; in true isotropic all measures of directional spatial correlation will form a perfect circle.
+
+
+# Appendix
+
+Other ideas and notes, in progress
+
+#### Prescriptions
+
+Using past history, measured on a very fine scale, to dictate agronomic practices on a fine scale - seeding rate, fertilizer needs, crop protetionc.
+
+#### Participatory Research
+
+#### Data Sources
+
+#### GPS-enabled Machinery
+
+#### Scouting data
+
+#### GIS layers

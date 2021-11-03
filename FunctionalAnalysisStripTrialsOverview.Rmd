@@ -1,0 +1,261 @@
+---
+title: "Functional Data Analysis and Experimental Design for On-farm Strip Trials : Overview"
+author: "Peter Claussen"
+date: "10/13/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+<!-- Adapted from ASA_CSSA_SSSA/2018/ThoughtsAboutPower -->
+
+
+# Introduction
+
+We use as a motivating example a simple but common split-planter strip trial. In this kind of trial, two crop varieties are compared side by side, each variety fed into one-half a planter. Below is an example a seeding trial map and the corresponding yield map.
+
+```{r,echo=FALSE}
+library(ggplot2)
+library(gridExtra)
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#F0E442","#CC79A7","#000000","#734f80", "#2b5a74", "#004f39", "#787221", "#003959", "#6aaf00", "#663cd3")
+grey <- cbPalette[1] #"#999999"
+orange <- cbPalette[2] #"#E69F00"
+skyblue <- cbPalette[3] #"#56B4E9"
+bluishgreen <- cbPalette[4] #"#009E73"
+yellow <- cbPalette[7] #"#F0E442"
+blue <- cbPalette[5] #"#0072B2"
+vermillion <- cbPalette[6] #"#D55E00"
+pair.colors <- c(2,5)
+```
+
+```{r,echo=FALSE}
+load(file="~/Work/git/ASA_CSSA_SSSA/2017/Workshop/Case Study 2/Strips.Rda")
+```
+
+
+```{r,EastQuarterMaps,echo=FALSE,fig.width=8,fig.height=6}
+grid.arrange(
+  arrangeGrob(
+        ggplot(EastQuarter.dat, aes(Easting,Northing)) + 
+           geom_point(aes(colour = Product),size=2) + 
+           scale_colour_manual(values=cbPalette[pair.colors]) +
+           #scale_colour_manual(values=cbPalette[pair.colors]) +
+           labs(colour = "Variety", x="Easting", y="Northing", title = "Seeding Map"),
+    ggplot(EastQuarter.dat, aes(Easting,Northing)) + 
+           geom_point(aes(colour = Yield),size=2) + 
+           scale_colour_gradient2(low=vermillion, mid=yellow, high=blue, midpoint = median(EastQuarter.dat$Yield)) +
+           labs(colour = "Yield", x="Easting", y="Northing",title="Harvest Map"),
+    nrow=2
+  )
+)
+```
+
+```{r,echo=FALSE}
+EastQuarter.dat$Pass <- floor(EastQuarter.dat$Northing/6)+1
+EastQuarter.dat$Pair <- floor((EastQuarter.dat$Pass+1)/2)
+EastQuarter.dat$Direction <- "Easterly"
+EastQuarter.dat$Direction[EastQuarter.dat$Heading>100] <- "Westerly"
+EastQuarter.dat$Direction <- as.factor(EastQuarter.dat$Direction)
+
+#EastQuarter.dat$Pass[EastQuarter.dat$Heading>100] <- EastQuarter.dat$Pass[EastQuarter.dat$Heading>100] + 400
+EastQuarter.dat$PassNo <- EastQuarter.dat$Pass
+
+EastQuarter.dat$Block <- ceiling(EastQuarter.dat$Pair/2)
+EastQuarter.dat$Strip <- EastQuarter.dat$Pair %/% EastQuarter.dat$Block
+EastQuarter.dat$Block <- as.factor(EastQuarter.dat$Block)
+EastQuarter.dat$Pass <- as.factor(EastQuarter.dat$Pass)
+EastQuarter.dat$Pair <- as.factor(EastQuarter.dat$Pair)
+EastQuarter.dat$Strip <- as.factor(EastQuarter.dat$Strip)
+```
+
+
+
+# Univariate Analysis
+
+For simplicity, we might model each strip as a single experimental unit - a very long and thin experimental unit, but still a single unit. This implies a two-sample $t$-test (in this case, a paired t-test may be more appropriate, but for illustration purposes, we'll use a two-sample $t$). We write a simple model of the form
+
+\begin{equation}
+	y_{ij} = \mu_i + e_{ij}
+\end{equation}
+for a number of treatments $i = 1, \dots, I$ and number of strips $j = 1, \dots, N_j$.
+We calculate mean and standard deviation
+\begin{align}
+	\widehat{\mu}_{i} &= \frac{\sum_{j=1}^{N_i} y_{ij}}{N_i} \\
+	\widehat{\sigma}_{i}^2 &= \frac{\sum_{j=1}^{N_i} (y_{ij} - \widehat{\mu}_{i} )^2}{N_i}
+\end{align}
+
+Let $y_{ij}$ - that is, we consider each individual yield estimate $y_{i j k}$ from the yield map as a sample from $y_{ij}$ and let
+
+\begin{equation}
+	y_{ij} = \bar{y}_{ij . } = \frac{\sum_{k=1}^{K} y_{ijk}}{K}
+\end{equation}
+
+```{r,echo=FALSE,include=FALSE}
+means.dat <- with(EastQuarter.dat, data.frame(
+  Pass = aggregate(Yield ~ Pair,EastQuarter.dat,mean,na.rm=TRUE)[,1],
+  Yield = aggregate(Yield ~ Pair,EastQuarter.dat,mean,na.rm=TRUE)[,2],
+  Product = aggregate(as.numeric(Product) ~ Pair,EastQuarter.dat,mean,na.rm=TRUE)[,2],
+  Northing = aggregate(Northing ~ Pair,EastQuarter.dat,mean,na.rm=TRUE)[,2]
+))
+means.dat
+means.dat$Product <- levels(EastQuarter.dat$Product)[means.dat$Product]
+```
+
+
+```{r,echo=FALSE,fig.width=8,fig.height=3}
+ggplot(means.dat, aes(x=Northing, y=Yield, color=Product,fill=Product)) +
+  geom_bar(stat="identity") + scale_colour_manual(values=cbPalette[pair.colors]) + scale_fill_manual(values=cbPalette[pair.colors])
+```
+
+We might then proceed to a simple paired t-test, assuming independent populations, and a pooled standard deviation and a equal number of strips for each treatment. We let $\delta$ denote the difference between means $\widehat{\mu}_1 - \widehat{\mu}_2$, and we use a t-test of
+
+\begin{equation}
+t = \frac{\delta}{\sqrt{2 \sigma^2/n}}
+\end{equation}
+
+```{r,echo=FALSE,include=FALSE}
+print(product.means <- tapply(means.dat$Yield,list(means.dat$Product),mean,na.rm=TRUE))
+print(product.sd <- tapply(means.dat$Yield,list(means.dat$Product),sd,na.rm=TRUE))
+print(pooled.sd <- mean(product.sd))
+```
+
+We compute a difference between treatmeant
+```{r}
+print(delta <- abs(product.means[1]-product.means[2]))
+print(pooled.t <- delta / (sqrt((2*pooled.sd^2)/6)))
+```
+
+Assuming a two-sided test, we can compute $p$-value ($Pr(>t)$) by
+```{r}
+2*(1-pt(pooled.t,10))
+```
+
+We find an approximate yield difference, over the length of the strips, of 15 bu/acre, which is statistically significant. We cannot, however, may any inferences if there are yield differences within different fertility zones. This is a key point to precision agriculture - we wish to know if there are different production zones in fields where crops respond differently.
+
+
+# Functional Data Analysis
+
+Unlike common small-plot trials, the experimental units in a strip trial are very long and thin, relative to length. The strips pass over different regions in the field with associated changes in soil profiles and other factors associated with fertility. We lose geospatial information when we average yield over individual strips.
+
+To analyze this experiment using functional data analysis, we consider each strip as a function of position in the field. Let $d$ denote distance along the East-West axis (*Easting*). We then let $y_{i j}$ be a function of $d$, and
+
+\begin{eqnarray}
+	\widehat{\mu}_{i}(d) &=& \frac{\sum_{j=1}^{N_i} y_{ij}(d)}{N_i} \\
+	\widehat{\sigma}_{i}^2(d) &=& \frac{\sum_{j=1}^{N_i} (y_{ij(d)} - \widehat{\mu}_{i}(d) )^2}{N_i}
+\end{eqnarray}
+
+Takeing the average over all yield points in a strip is equivalent to the constant function $y_{ij}(d) = \widehat{\mu}_{i}$. The figure below is equivalent to the bar chart in the previous graph.
+
+```{r,echo=FALSE,fig.width=8,fig.height=3}
+ggplot(EastQuarter.dat, aes(Easting,Yield)) + 
+geom_point(aes(colour = Product),size=.2) + 
+scale_colour_manual(values=cbPalette[pair.colors]) + stat_smooth(method=lm, formula = y ~ 1, aes(group=Pair, colour = Product),se=FALSE) +
+labs(colour = "Variety", x="Easting", y="Yield", title = "Yield as a constant function")
+```
+
+
+## Yield Function
+
+How do we convert the raw observations, taken at arbitrary distances as the combine travels across the field, to a smooth function that we can use to interpolate yield values at specific points? One simple method is LOESS smoothing (we consider different methods of functional data in other reports). This method retains one dimension (East-West) for spatial information, and uses one dimension (North-South) for statistical comparisons.
+
+```{r,echo=FALSE,fig.width=8,fig.height=3}
+ggplot(EastQuarter.dat, aes(Easting,Yield)) + 
+geom_point(aes(colour = Product),size=.2) + 
+scale_colour_manual(values=cbPalette[pair.colors]) + stat_smooth(aes(group=Pair, colour = Product),se=FALSE) +
+labs(colour = "Variety", x="Easting", y="Yield", title = "East Quarter")
+```
+
+
+
+```{r,echo=FALSE}
+LOESS.basis <- rep(seq(2,398,by=2))
+total.passes <- max(EastQuarter.dat$PassNo)
+Smoothed.dat <- data.frame(
+  Yield = rep(0,total.passes*length(LOESS.basis)),
+  Easting = rep(LOESS.basis,total.passes),
+  PassNo = rep(1:total.passes,each=length(LOESS.basis)),
+  Pair = rep(0,total.passes*length(LOESS.basis)),
+  Product = rep(levels(EastQuarter.dat$Product),total.passes*length(LOESS.basis)/2),
+  Northing = rep(0,total.passes*length(LOESS.basis))
+)
+#for(i in 1:max(EastQuarter.dat$PassNo)) {
+for(i in 1:total.passes) {
+  current.pass <- EastQuarter.dat[EastQuarter.dat$PassNo==i,]
+  current.loess <- loess(Yield ~ Easting,data=current.pass)
+  current.smoothed <- predict(current.loess, data.frame(Easting = LOESS.basis))
+  Smoothed.dat$Yield[Smoothed.dat$PassNo==i] <- current.smoothed
+  Smoothed.dat$Pair[Smoothed.dat$PassNo==i] <- current.pass$Pair[1]
+  Smoothed.dat$Product[Smoothed.dat$PassNo==i] <- current.pass$Product[1]
+  Smoothed.dat$Northing[Smoothed.dat$PassNo==i] <- mean(current.pass$Northing)
+}
+Smoothed.dat$Pass <- as.factor(Smoothed.dat$PassNo)
+```
+
+```{r,eval=FALSE,echo=FALSE}
+ggplot(Smoothed.dat, aes(Easting,Yield)) + 
+geom_point(aes(colour = Product),size=.2) + 
+scale_colour_manual(values=cbPalette[pair.colors]) + 
+labs(colour = "Variety", x="Easting", y="Yield", title = "East Quarter") +
+  ylim(125, 275)
+```
+
+# Functional $t$ tests
+
+Given that $\mu$ and $\sigma$ are functions, we can write a functional t-test as
+
+\begin{equation}
+t(d) = \frac{\delta(d)}{\sqrt{2 \sigma(d)^2/n}}
+\end{equation}
+
+where $\delta(t) = abs(\mu_1(d) - \mu_2(d))$. Similarly, we produce a function form of the $p$-value.
+
+```{r,echo=FALSE}
+TTests <- data.frame(
+  Easting = LOESS.basis
+)
+for(i in 1:length(LOESS.basis)) {
+  l <- LOESS.basis[i]
+  obs <- Smoothed.dat[Smoothed.dat$Easting==l,]
+  product.means <- tapply(obs$Yield,list(obs$Product),mean,na.rm=TRUE)
+  product.sd <- tapply(obs$Yield,list(obs$Product),sd,na.rm=TRUE)
+  TTests$Delta[i] <- product.means[1]-product.means[2]
+  TTests$SD[i] <- sqrt(sum(product.sd^2)/2)
+}
+TTests$t <- TTests$Delta/(sqrt((2*TTests$SD^2)/6))
+TTests$P <- 2*(1-pt(TTests$t,10))
+```
+
+
+```{r,echo=FALSE,fig.width=8,fig.height=6}
+CombinedT <- data.frame(
+  Easting=rep(TTests$Easting,4),
+  Measure = c(rep('Treatment Differences',length(TTests$Delta)),
+              rep('Standard Deviation',length(TTests$SD)),
+              rep('t Ratio',length(TTests$t)),
+              rep('Probability>t',length(TTests$P))),
+  Value = c(TTests$Delta,TTests$SD,TTests$t,TTests$P),
+  Signficant = rep(TTests$P<0.05,4)
+)
+CombinedT$Measure <- factor(CombinedT$Measure,levels=c('Treatment Differences','Standard Deviation','t Ratio','Probability>t'))
+ggplot(CombinedT, aes(Easting,Value)) + 
+geom_point(aes(color=Signficant)) + #cbPalette[1]) + 
+scale_colour_manual(values=cbPalette) +
+labs(x="Easting", title = "Functional Statistics") + facet_wrap(~ Measure,nrow = 4,scales="free_y")
+```
+
+
+This final graph shows $t$-tests and $p$-values as a function of distance across the field. We see, at the top, that yield difference among the two varieties varies between 12 to 18 bu/acre, with the most extreme differences in the right hand (Eastern) portion of field. This part of the field also shows less variability. Thus, significant differences are found in the range of ~ 200 to ~400 meters from the western edge of the field.
+
+Further work on this type of analysis includes model selection for the function form of the data, and extending the one-dimensional strip model to a two-dimensional spatial field model.
+
+```{r,echo=FALSE,eval=FALSE}
+#par(mfrow=c(2,2))
+#par(mfrow=c(4,1))
+plot(Delta ~ Easting,data=TTests,type='l',main='Treatment Differences')
+plot(SD ~ Easting,data=TTests,type='l',main='Standard Deviation')
+plot(t ~ Easting,data=TTests,type='l',main='t statistic')
+abline(h=qt(1-0.05/2,10),col='blue')
+plot(P ~ Easting,data=TTests,type='l',col='blue',main='Probability')
+abline(h=0.05,col='red')
+```
+

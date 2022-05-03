@@ -1,0 +1,148 @@
+---
+title: "Overview"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+
+set.seed(1000)
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(mgcv)
+library(splines)
+library(gstat)
+library(ape)
+
+  grey <- "#999999"
+  orange <- "#E69F00"
+  skyblue <- "#56B4E9"
+  bluishgreen <- "#009E73"
+  yellow <- "#F0E442"
+  blue <- "#0072B2"
+  vermillion <- "#D55E00"
+  
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#F0E442","#CC79A7","#000000","#734f80", "#2b5a74", "#004f39", "#787221", "#003959", "#6aaf00", "#663cd3")
+
+source('./R/remove.harvest.outliers.fn.R')
+source('./R/spatial.model.selection.R')
+source('./R/select.best.variogram.R')
+source('./R/spatial.selection.plots.R')
+```
+
+
+$$
+y(s) = X(s) + e(s)
+$$
+
+## Load Data
+
+```{r}
+source('./R/plot.fairfield.R')
+print(base.plot)
+```
+
+Model Complexity
+
+# bs 
+
+```{r}
+m='bs'
+range=c(3,17)
+Models.bs <- spatial.model.selection(fairfield.dat,range=range,method=m)
+Models.bs.plots <- spatial.selection.plots(Models.ns)
+
+print(Models.bs.plots$Selection)
+print(Models.bs.plots$Variogram)
+print(Models.bs.plots$Residuals)
+```
+
+
+```{r}
+m='ns'
+range=c(3,17)
+Models.ns <- spatial.model.selection(fairfield.dat,range=range,method=m)
+Models.ns.plots <- spatial.selection.plots(Models.ns)
+```
+
+```{r}
+print(Models.ns.plots$Selection)
+print(Models.ns.plots$Variogram)
+print(Models.ns.plots$Residuals)
+```
+
+
+```{r}
+m='bs'
+range=c(3,17)
+Models.bs <- spatial.model.selection(fairfield.dat,range=range,method=m)
+
+Models.bs.plots <- spatial.selection.plots(Models.bs)
+```
+
+```{r}
+print(Models.bs.plots$Selection)
+print(Models.bs.plots$Variogram)
+print(Models.bs.plots$Residuals)
+```
+
+
+```{r}
+m='gam'
+range=c(3,200)
+Models.gam <- spatial.model.selection(fairfield.dat,range=range,method=m)
+
+Models.gam.plots <- spatial.selection.plots(Models.gam)
+```
+
+```{r}
+print(Models.gam.plots$Selection)
+print(Models.gam.plots$Variogram)
+print(Models.gam.plots$Residuals)
+```
+
+```{r}
+m='tp'
+range=c(2,24)
+Models.tp <- spatial.model.selection(fairfield.dat,range=range,method=m)
+
+Models.tp.plots <- spatial.selection.plots(Models.tp)
+```
+
+```{r}
+print(Models.tp.plots$Selection)
+print(Models.tp.plots$Variogram)
+print(Models.tp.plots$Residuals)
+```
+
+
+```{r}
+m='te'
+range=c(2,24)
+Models.te <- spatial.model.selection(fairfield.dat,range=range,method=m)
+
+Models.te.plots <- spatial.selection.plots(Models.te)
+```
+
+```{r}
+print(Models.te.plots$Selection)
+print(Models.te.plots$Variogram)
+print(Models.te.plots$Residuals)
+```
+
+
+```{r}
+m='re'
+range=c(2,9)
+Models.re <- spatial.model.selection(fairfield.dat,range=range,method=m)
+
+Models.re.plots <- spatial.selection.plots(Models.re)
+```
+
+```{r}
+print(Models.re.plots$Selection)
+print(Models.re.plots$Variogram)
+print(Models.re.plots$Residuals)
+```
+

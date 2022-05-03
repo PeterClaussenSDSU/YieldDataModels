@@ -1,0 +1,136 @@
+---
+title: "Overview"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+set.seed(1000)
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(gstat)
+library(splines)
+  grey <- "#999999"
+  orange <- "#E69F00"
+  skyblue <- "#56B4E9"
+  bluishgreen <- "#009E73"
+  yellow <- "#F0E442"
+  blue <- "#0072B2"
+  vermillion <- "#D55E00"
+  
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#F0E442","#CC79A7","#000000","#734f80", "#2b5a74", "#004f39", "#787221", "#003959", "#6aaf00", "#663cd3")
+
+source('./R/remove.harvest.outliers.fn.R')
+source('./R/spatial.model.selection.R')
+source('./R/select.best.variogram.R')
+source('./R/spatial.selection.plots.R')
+```
+
+
+## Load Data
+
+```{r}
+source('./R/plot.fairfield.R')
+print(base.plot)
+```
+
+```{r}
+library(lattice)
+contourplot(Yield ~ Latitude * Longitude, data=fairfield.dat)
+levelplot(Yield ~ Latitude * Longitude, data=fairfield.dat,col.regions = terrain.colors(12),at = c(-Inf, seq(min(fairfield.dat$Yield), max(fairfield.dat$Yield), length.out=10), Inf))
+
+m='bs'
+range=c(3,17)
+Models.bs <- spatial.model.selection(fairfield.dat,range=range,method=m)
+Models.bs.plots <- spatial.selection.plots(Models.bs)
+
+print(Models.bs.plots$Selection)
+print(Models.bs.plots$Variogram)
+print(Models.bs.plots$Residuals)
+```
+
+
+```{r}
+source('./R/plot.antelope.R')
+print(base.plot)
+
+contourplot(Yield ~ Latitude * Longitude, data=antelope.dat)
+levelplot(Yield ~ Latitude * Longitude, data=antelope.dat,col.regions = terrain.colors(12),at = c(-Inf, seq(min(antelope.dat$Yield), max(antelope.dat$Yield), length.out=10), Inf))
+
+
+range=c(3,17)
+Models.bs <- spatial.model.selection(antelope.dat,range=range,method=m)
+Models.bs.plots <- spatial.selection.plots(Models.bs)
+
+print(Models.bs.plots$Selection)
+print(Models.bs.plots$Variogram)
+print(Models.bs.plots$Residuals)
+```
+
+
+```{r}
+source('./R/plot.arlington.R')
+print(base.plot)
+
+contourplot(Yield ~ Latitude * Longitude, data=arlington.dat)
+levelplot(Yield ~ Latitude * Longitude, data=arlington.dat,col.regions = terrain.colors(12),at = c(-Inf, seq(min(arlington.dat$Yield), max(arlington.dat$Yield), length.out=10), Inf))
+
+range=c(3,17)
+Models.bs <- spatial.model.selection(arlington.dat,range=range,method=m)
+Models.bs.plots <- spatial.selection.plots(Models.bs)
+
+print(Models.bs.plots$Selection)
+print(Models.bs.plots$Variogram)
+print(Models.bs.plots$Residuals)
+```
+
+# Mercer and Hall
+```{r}
+source('./R/plot.mercer.R')
+print(base.plot)
+
+contourplot(Yield ~ Latitude * Longitude, data=mercer.dat)
+levelplot(Yield ~ Latitude * Longitude, data=mercer.dat,col.regions = terrain.colors(12),at = c(-Inf, seq(min(mercer.dat$Yield), max(mercer.dat$Yield), length.out=10), Inf))
+
+range=c(1,12)
+Models.bs <- spatial.model.selection(mercer.dat,range=range,method='ns',models=12,moments=TRUE)
+Models.bs.plots <- spatial.selection.plots(Models.bs)
+
+print(Models.bs.plots$Selection)
+print(Models.bs.plots$Variogram)
+print(Models.bs.plots$Residuals)
+```
+
+```{r}
+source('./R/plot.winterwheat.R')
+print(base.plot)
+
+contourplot(Yield ~ Latitude * Longitude, data=winterwheat.dat)
+levelplot(Yield ~ Latitude * Longitude, data=winterwheat.dat,col.regions = terrain.colors(12),at = c(-Inf, seq(min(winterwheat.dat$Yield), max(winterwheat.dat$Yield), length.out=10), Inf))
+
+range=c(3,17)
+Models.bs <- spatial.model.selection(winterwheat.dat,range=range,method=m)
+Models.bs.plots <- spatial.selection.plots(Models.bs)
+
+print(Models.bs.plots$Selection)
+print(Models.bs.plots$Variogram)
+print(Models.bs.plots$Residuals)
+```
+
+```{r}
+source('./R/plot.wiebe.R')
+print(base.plot)
+
+contourplot(Yield ~ Latitude * Longitude, data=wiebe.dat)
+levelplot(Yield ~ Latitude * Longitude, data=wiebe.dat,col.regions = terrain.colors(12),at = c(-Inf, seq(min(wiebe.dat$Yield), max(wiebe.dat$Yield), length.out=10), Inf))
+
+range=c(3,17)
+Models.bs <- spatial.model.selection(wiebe.dat,range=range,method=m)
+Models.bs.plots <- spatial.selection.plots(Models.bs)
+
+print(Models.bs.plots$Selection)
+print(Models.bs.plots$Variogram)
+print(Models.bs.plots$Residuals)
+
+```

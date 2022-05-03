@@ -6,7 +6,7 @@ spatial.selection.plots <- function(models) {
     geom_point(aes(colour = Criteria),size=2) + 
     geom_line(aes(colour = Criteria),size=1) + 
     scale_colour_manual(values=cbPalette) + facet_wrap(~Criteria,nrow=3,scales="free_y") +
-    labs(title=main, x ="Degrees Freedom", y = "Score")
+    labs(title=main, x ="Smoothing Parameter", y = "Score")
 
   models$VariogramData$Source <- 'Model'
   models$ResidualsData$Source <- 'Residuals'

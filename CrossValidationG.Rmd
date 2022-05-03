@@ -1,0 +1,145 @@
+---
+title: "Field G"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+#theme_set(theme_dag())
+#since we have k-fold cross validation
+
+set.seed(1000)
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+
+library(mgcv)
+library(splines)
+
+#library(ape)
+
+yellow <- "#F0E442"
+blue <- "#0072B2"
+vermillion <- "#D55E00"
+  
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#F0E442","#CC79A7","#000000","#734f80", "#2b5a74", "#004f39", "#787221", "#003959", "#6aaf00", "#663cd3")
+
+
+source('./R/remove.harvest.outliers.fn.R')
+source('./R/spatial.model.selection.R')
+source('./R/select.best.variogram.R')
+source('./R/spatial.selection.plots.R')
+source('./R/read.yield.data.R')
+source('./R/combined.map.R')
+```
+
+
+Elbow plot/Elbow method
+
+
+## Load Data
+
+
+```{r,eval=TRUE,echo=FALSE}
+field = 'G'
+root = '../ManagementZoneML/data/'
+
+Years <- c(2013,2014,2015,2016,2017,2018,2020)
+Crops <- c('Corn','Soybeans','Corn','Soybeans','Corn','Soybeans','Corn')
+harvests <-vector(mode='list',length=length(Years))
+for(i in 1:length(Years)) {
+  harvests[[i]] <- read.yield.data(root,field,Years[i],Crops[i])
+}
+```
+
+
+Consider using k-fold cross-validation methods for model selection. Ingeneral bs() seems to provide good results, so we will use that as the base model
+
+Since this is spatial data, we need to make sure we sample the folds over the entire field.
+
+```{r}
+current.dat <- harvests[[1]]
+current.dat$LatGroup <- cut(current.dat$Latitude,breaks=8)
+current.dat$LonGroup <- cut(current.dat$Longitude,breaks=8)
+```
+
+Assign k groups
+```{r}
+current.dat$K <- 0
+for(lat in unique(current.dat$LatGroup)) {
+  for(lon in unique(current.dat$LonGroup)) {
+    mask <- current.dat$LatGroup==lat & current.dat$LonGroup==lon
+    samples <- sum(mask)
+    ks <- rep(1:20,length.out=samples)
+    current.dat$K[mask] <- sample(ks)
+  }
+}
+```
+
+```{r}
+ggplot(current.dat, aes(Longitude,Latitude)) + 
+geom_point(aes(colour = Yield),size=1) + 
+scale_colour_gradient2(low=vermillion, mid=yellow, high=blue, midpoint = 0.5) +
+labs(colour = "K folds", x="Easting", y="Northing", title = "Yield Map") + facet_wrap(~K)
+```
+
+```{r}
+
+kvec <- 2*(1:10)+4
+folds <- unique(current.dat$K)
+CV.tbl <- expand.grid(Fold=folds,K=kvec)
+CV.tbl$bs.MSE <- NA
+```
+
+```{r}
+for(k in kvec) {
+  for(fold in folds) {
+    #train 
+    mask <- current.dat$K==fold
+    train.dat <- current.dat[!mask,]
+    dim(train.dat)
+    #train.lm <- lm(Yield ~ bs(Longitude,df=k)*bs(Latitude,df=k), data=train.dat)
+    train.gam <- gam(Yield ~ s(Longitude,Latitude,k=k), data=train.dat)
+    test.dat <- current.dat[mask,]
+    dim(test.dat)
+    pred <- predict(train.gam,newdata=test.dat)
+    #pred <- predict(train.lm,newdata=test.dat)
+    MSE <- sum(test.dat$Yield-pred)^2
+    CV.tbl$bs.MSE[CV.tbl$Fold==fold & CV.tbl$K==k] <- MSE
+  }
+}
+
+#Models[[i]] <- lm(Yield ~ bs(Longitude,df=k.vec[i])*bs(Latitude,df=k.vec[i]), data=harvests[[1]])
+```
+
+
+```{r}
+CV.tbl$ns.MSE <- NA
+for(k in kvec) {
+  for(fold in folds) {
+    #train 
+    mask <- current.dat$K==fold
+    train.dat <- current.dat[!mask,]
+    dim(train.dat)
+    train.lm <- lm(Yield ~ ns(Longitude,df=k)*ns(Latitude,df=k), data=train.dat)
+    test.dat <- current.dat[mask,]
+    dim(test.dat)
+    pred <- predict(train.lm,newdata=test.dat)
+    MSE <- sum(test.dat$Yield-pred)^2
+    CV.tbl$ns.MSE[CV.tbl$Fold==fold & CV.tbl$K==k] <- MSE
+  }
+}
+```
+
+```{r}
+boxplot(bs.MSE ~ K,data=CV.tbl)
+```
+
+```{r}
+boxplot(ns.MSE ~ K,data=CV.tbl)
+```
+
+
+```{r}
+#save(Methods,file='ModelsG.Rda')
+```

@@ -1,0 +1,500 @@
+---
+title: "Stevens East"
+author: "Peter Claussen"
+date: "7/2/2020"
+output:
+  html_document: default
+  pdf_document: default
+bibliography: bibliography.bib
+---
+
+```{r setup, include=FALSE}
+library(gstat)
+library(ggplot2)
+grey <- "#999999"
+orange <- "#E69F00"
+skyblue <- "#56B4E9"
+bluishgreen <- "#009E73"
+yellow <- "#F0E442"
+blue <- "#0072B2"
+vermillion <- "#D55E00"
+reddishpurple <- "#CC79A7"
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7",
+                "#000000","#734f80", "#2b5a74", "#004f39", "#787221", "#003959", "#6aaf00", "#663cd3")
+source('./R/add.metric.R')
+source('./R/plot.gps.grids.R')
+```
+
+
+## [1] "./data/G 2013 Corn Harvest.csv"
+## [1] "./data/G 2014 Soybeans Harvest.csv"
+## [1] "./data/G 2015 Corn Harvest.csv"
+## [1] "./data/G 2016 Soybeans Harvest.csv"
+
+
+
+```{r,echo=FALSE}
+corn.2013.dat <- read.csv('../ManagementZoneML/data/G 2013 Corn Harvest.csv')
+corn.2013.dat$Yield <- rank(corn.2013.dat$Yield)
+corn.2013.dat$Yield <- corn.2013.dat$Yield/max(corn.2013.dat$Yield)
+
+corn.2013.dat$Swaths <- 7
+corn.2013.dat$SWATHWIDTH <- 5
+
+soybean.2014.dat <- read.csv('../ManagementZoneML/data/G 2014 Soybeans Harvest.csv')
+soybean.2014.dat$Yield <- rank(soybean.2014.dat$Yield)
+soybean.2014.dat$Yield <- soybean.2014.dat$Yield/max(soybean.2014.dat$Yield)
+
+soybean.2014.dat$Swaths <- 7
+soybean.2014.dat$SWATHWIDTH <- 5
+
+corn.2015.dat <- read.csv('../ManagementZoneML/data/G 2015 Corn Harvest.csv')
+corn.2015.dat$Yield <- rank(corn.2015.dat$Yield)
+corn.2015.dat$Yield <- corn.2015.dat$Yield/max(corn.2015.dat$Yield)
+
+corn.2015.dat$Swaths <- 7
+corn.2015.dat$SWATHWIDTH <- 5
+
+soybean.2016.dat <- read.csv('../ManagementZoneML/data/G 2016 Soybeans Harvest.csv')
+soybean.2016.dat$Yield <- rank(soybean.2016.dat$Yield)
+soybean.2016.dat$Yield <- soybean.2016.dat$Yield/max(soybean.2016.dat$Yield)
+soybean.2016.dat$Swaths <- 7
+soybean.2016.dat$SWATHWIDTH <- 5
+
+corn.2017.dat <- read.csv('../ManagementZoneML/data/G 2017 Corn Harvest.csv')
+corn.2017.dat$Yield <- rank(corn.2017.dat$Yield)
+corn.2017.dat$Yield <- corn.2017.dat$Yield/max(corn.2017.dat$Yield)
+corn.2017.dat$Swaths <- 7
+corn.2017.dat$SWATHWIDTH <- 5
+
+soybean.2018.dat <- read.csv('../ManagementZoneML/data/G 2018 Soybeans Harvest.csv')
+soybean.2018.dat$Yield <- rank(soybean.2018.dat$Yield)
+soybean.2018.dat$Yield <- soybean.2018.dat$Yield/max(soybean.2018.dat$Yield)
+soybean.2018.dat$Swaths <- 7
+soybean.2018.dat$SWATHWIDTH <- 5
+
+
+corn.2020.dat <- read.csv('../ManagementZoneML/data/G 2020 Corn Harvest.csv')
+corn.2020.dat$Yield <- rank(corn.2020.dat$Yield)
+corn.2020.dat$Yield <- corn.2020.dat$Yield/max(corn.2020.dat$Yield)
+corn.2020.dat$Swaths <- 7
+corn.2020.dat$SWATHWIDTH <- 5
+
+soybean.2021.dat <- read.csv('../ManagementZoneML/data/G 2021 Soybeans Harvest.csv')
+soybean.2021.dat$Yield <- rank(soybean.2021.dat$Yield)
+soybean.2021.dat$Yield <- soybean.2021.dat$Yield/max(soybean.2021.dat$Yield)
+soybean.2021.dat$Swaths <- 7
+soybean.2021.dat$SWATHWIDTH <- 5
+
+
+corn.2013.dat$Year <- 2013
+soybean.2014.dat$Year <- 2014
+corn.2015.dat$Year <- 2015
+soybean.2016.dat$Year <- 2016
+corn.2017.dat$Year <- 2017
+soybean.2018.dat$Year <- 2018
+corn.2020.dat$Year <- 2020
+soybean.2021.dat$Year <- 2021
+
+combined.dat <- rbind(corn.2013.dat,soybean.2014.dat,corn.2015.dat,soybean.2016.dat,corn.2017.dat,soybean.2018.dat,corn.2020.dat,soybean.2021.dat)
+```
+
+```{r,fig.width=8,fig.height=8,echo=FALSE}
+ggplot(combined.dat, aes(Longitude,Latitude)) + 
+geom_point(aes(colour = Yield),size=1) + 
+scale_colour_gradient2(low=vermillion, mid=yellow, high=blue,midpoint = 0.5) +
+#scale_colour_gradient(low=cbPalette[8], high=cbPalette[5]) +
+labs(colour = "Rank (normalized)", x="X (m)", y="Y (m)") + facet_wrap(~ Year)
+```
+
+### 2013
+
+```{r,fig.width=6,fig.height=8}
+plot.gps.grids(corn.2013.dat,plots=0,residuals=TRUE) 
+```
+
+### 2014
+
+```{r,fig.width=6,fig.height=8}
+plot.gps.grids(soybean.2014.dat,plots=0,residuals=TRUE) 
+```
+
+
+### 2015
+
+```{r,fig.width=6,fig.height=8}
+plot.gps.grids(corn.2015.dat,plots=0,residuals=TRUE) 
+```
+
+### 2016
+
+```{r,fig.width=6,fig.height=8}
+plot.gps.grids(soybean.2016.dat,plots=0,residuals=TRUE) 
+```
+
+### 2017
+
+```{r,fig.width=6,fig.height=8}
+plot.gps.grids(corn.2017.dat,plots=0,residuals=TRUE) 
+```
+
+### 2018
+
+
+```{r,fig.width=6,fig.height=8}
+plot.gps.grids(soybean.2018.dat,plots=0,residuals=TRUE) 
+```
+
+### 2020
+
+```{r,fig.width=6,fig.height=8}
+plot.gps.grids(corn.2020.dat,plots=0,residuals=TRUE) 
+```
+
+
+### 2021
+
+```{r,fig.width=6,fig.height=8}
+plot.gps.grids(soybean.2021.dat,plots=0,residuals=TRUE) 
+```
+
+
+
+# Variograms
+
+## Yield Monitor
+
+### Full Field
+```{r}
+
+corn.2013.var <- variogram(Yield~1, 
+                          locations=~Longitude+Latitude,
+                          alpha=c(0,45,90),
+                          data=corn.2013.dat)
+plot(corn.2013.var)
+
+
+soybean.2014.var <- variogram(Yield~1, 
+                          locations=~Longitude+Latitude,
+                          alpha=c(0,45,90),
+                          data=soybean.2014.dat)
+plot(soybean.2014.var)
+
+corn.2015.var <- variogram(Yield~1, 
+                          locations=~Longitude+Latitude,
+                          alpha=c(0,45,90),
+                          data=corn.2015.dat)
+plot(corn.2015.var)
+
+soybean.2016.var <- variogram(Yield~1, 
+                          locations=~Longitude+Latitude,
+                          alpha=c(0,45,90),
+                          data=soybean.2016.dat)
+plot(soybean.2016.var)
+
+corn.2017.var <- variogram(Yield~1, 
+                          locations=~Longitude+Latitude,
+                          alpha=c(0,45,90),
+                          data=corn.2017.dat)
+plot(corn.2017.var)
+
+soybean.2018.var <- variogram(Yield~1, 
+                          locations=~Longitude+Latitude,
+                          alpha=c(0,45,90),
+                          data=soybean.2018.dat)
+plot(soybean.2018.var)
+
+
+corn.2020.var <- variogram(Yield~1, 
+                          locations=~Longitude+Latitude,
+                          alpha=c(0,45,90),
+                          data=corn.2020.dat)
+plot(corn.2020.var)
+
+
+soybean.2021.var <- variogram(Yield~1, 
+                          locations=~Longitude+Latitude,
+                          alpha=c(0,45,90),
+                          data=soybean.2021.dat)
+plot(soybean.2021.var)
+
+```
+
+## Functional models for Random Fields
+
+### LOESS
+
+```{r}
+#when using VRYIELDRY
+#spans <- c(0.05, 0.1, 0.2, 0.4, 0.6, 0.8)
+
+#note - at 2^(-6) the edges are problematic
+spans <- 2^(-5:0)
+
+LOESS <- vector(length(spans),mode='list')
+Variograms <- vector(length(spans),mode='list')
+Residuals <- vector(length(spans),mode='list')
+Estimates <- vector(length(spans),mode='list')
+loess.dat <- NULL
+idx <- 0
+for(span in spans) {
+  idx <- idx + 1
+  tmp.dat <- corn.2015.dat[,c('Longitude','Latitude','Yield')]
+  tmp.loess <- loess(Yield ~ Longitude + Latitude, span=span ,data=tmp.dat)
+  tmp.dat$Yield <- predict(tmp.loess)
+  tmp.dat$residuals <- residuals(tmp.loess)
+  tmp.dat$Span = span
+  loess.dat <- rbind(loess.dat, tmp.dat)
+  Estimates[[idx]] <- tmp.dat
+  tmp.var <- variogram(Yield~1, 
+                          locations=~Longitude+Latitude,
+                          alpha=c(0,45,90),
+                          data=tmp.dat)
+  Variograms[[idx]] <- tmp.var
+  #plot(tmp.dat$Yield)
+  tmp.var <- variogram(residuals~1, 
+                          locations=~Longitude+Latitude,
+                          alpha=c(0,45,90),
+                          data=tmp.dat)
+  Residuals[[idx]] <- tmp.var
+  #plot(tmp.var,main=paste('residuals',span))
+}
+```
+
+
+
+```{r,fig.width=7,fig.height=8}
+#loess.dat <- rbind(loess.dat, tmp.dat)
+
+ggplot(loess.dat, aes(Longitude,Latitude)) + 
+geom_point(aes(colour = Yield),size=1) + 
+scale_colour_gradient2(low=vermillion, mid=yellow, high=blue,midpoint = mean(loess.dat$Yield)) +
+#scale_colour_gradient(low=cbPalette[8], high=cbPalette[5]) +
+labs(colour = "LOESS", x="X (m)", y="Y (m)") + facet_wrap(~ Span)
+```
+
+```{r,fig.width=7,fig.height=8}
+ggplot(loess.dat, aes(Longitude,Latitude)) + 
+geom_point(aes(colour = residuals),size=1) + 
+scale_colour_gradient2(low=vermillion, mid=yellow, high=blue,midpoint = 0) +
+#scale_colour_gradient(low=cbPalette[8], high=cbPalette[5]) +
+labs(colour = "Residuals", x="X (m)", y="Y (m)") + facet_wrap(~ Span)
+```
+
+```{r,fig.width=6,fig.height=3}
+plot(Variograms[[1]],main=paste('LOESS',spans[1]))
+plot(Variograms[[2]],main=paste('LOESS',spans[2]))
+plot(Variograms[[3]],main=paste('LOESS',spans[3]))
+plot(Variograms[[4]],main=paste('LOESS',spans[4]))
+plot(Variograms[[5]],main=paste('LOESS',spans[5]))
+plot(Variograms[[6]],main=paste('LOESS',spans[6]))
+```
+
+```{r,fig.width=6,fig.height=3}
+plot(Residuals[[1]],main=paste('Residuals',spans[1]))
+plot(Residuals[[2]],main=paste('Residuals',spans[2]))
+plot(Residuals[[3]],main=paste('Residuals',spans[3]))
+plot(Residuals[[4]],main=paste('Residuals',spans[4]))
+plot(Residuals[[5]],main=paste('Residuals',spans[5]))
+plot(Residuals[[6]],main=paste('Residuals',spans[6]))
+```
+
+```{r,fig.width=8,fig.height=6}
+library(moments)
+par(mfrow=c(2,3))
+for(i in 1:6) {
+  hist(Estimates[[i]]$Yield,
+       main=paste('LOESS',spans[i]),
+       xlab=paste("sk=",format(skewness(Estimates[[i]]$Yield),digits=4),
+                  "ku = ",format(kurtosis(Estimates[[i]]$Yield),digits=4))
+       )
+}
+```
+
+```{r,fig.width=8,fig.height=6}
+library(moments)
+par(mfrow=c(2,3))
+for(i in 1:6) {
+  hist(Estimates[[i]]$residuals,
+       main=paste('Residuals',spans[i]),
+       xlab=paste("sk=",format(skewness(Estimates[[i]]$residuals),digits=4),
+                  "ku = ",format(kurtosis(Estimates[[i]]$residuals),digits=4))
+       )
+}
+```
+
+Borrowed from 7.grid_cells.Rmd (Workshop)
+
+```{r}
+grid.dists <- as.matrix(dist(cbind(corn.2015.dat$Longitude,corn.2015.dat$Latitude)))
+grid.dists <- 1/grid.dists
+diag(grid.dists) <- 0
+library(ape)
+
+Moran.tbl <- data.frame(Source=rep(0,7),
+                        Expected=rep(0,7),
+                        MoranI.Y=rep(NA,7),
+                        SD.Y=rep(NA,7),
+                        p.Y=rep(NA,7),
+                        MoranI.Res=rep(NA,7),
+                        SD.Res=rep(NA,7),
+                        p.Res=rep(NA,7))
+
+yield.I <- Moran.I(corn.2015.dat$Yield, grid.dists)
+Moran.tbl$Source[1] <- 0
+Moran.tbl$MoranI.Y[1] <- yield.I$observed
+Moran.tbl$Expected <- yield.I$expected
+Moran.tbl$SD.Y[1] <- yield.I$sd
+Moran.tbl$p.Y[1] <- yield.I$p.value
+Moran.tbl$MoranI.Res[1] <- 0
+Moran.tbl$p.Res[1] <- 1
+for(i in 1:6) {
+  yield.I <-Moran.I(Estimates[[i]]$Yield, grid.dists)
+  res.I <-Moran.I(Estimates[[i]]$residuals, grid.dists)
+  Moran.tbl$Source[i+1] <- spans[i]
+  Moran.tbl$MoranI.Y[i+1] <- yield.I$observed
+  Moran.tbl$SD.Y[i+1] <- yield.I$sd
+  Moran.tbl$p.Y[i+1] <- yield.I$p.value
+  Moran.tbl$MoranI.Res[i+1] <- res.I$observed
+  Moran.tbl$SD.Res[i+1] <- res.I$sd
+  Moran.tbl$p.Res[i+1] <- res.I$p.value
+}
+Moran.tbl
+```
+
+```{r}
+par(mfrow=c(1,3))
+plot(MoranI.Y ~ Source,data=Moran.tbl)
+plot(MoranI.Res ~ Source,data=Moran.tbl)
+plot(MoranI.Res ~ MoranI.Y,data=Moran.tbl)
+```
+
+```{r}
+#fit<-lm(Yield ~ bs(Longitude + Latitude),data = corn.2015.dat)
+
+Yield1.lm <- lm(Yield ~ poly(Longitude, Latitude, degree=5), data=corn.2015.dat)
+```
+
+The response surface library `rsm` has some useful plots to help us visualize the trend surface
+
+```{r,fig.width=8,fig.height=4}
+library(rsm)
+par(mfrow=c(1,3))
+image(Yield1.lm, Latitude ~ Longitude)
+contour(Yield1.lm,Latitude ~ Longitude, image = TRUE)
+persp(Yield1.lm, Latitude ~ Longitude, zlab = "Yield, Poly 5")
+```
+
+
+```{r}
+#image(x=loess.dat$Longitude, y=loess.dat$Latitude, z=loess.dat$Yield)
+#contour(x=loess.dat$Longitude, y=loess.dat$Latitude, z=loess.dat$Yield, image = TRUE)
+```
+
+### B-splines
+
+Perperoglou [-@perperoglou-2019] note that the `bs` spline function in R may produce spurious results when used with 2-dimensional data.
+
+### Natural Splines
+
+
+### Generalized Additive Models
+
+`gamlss`
+
+#### `mgcv`
+ Adapted from https://stackoverflow.com/questions/16554690/interpolate-in-a-3-dimensional-spline-in-r
+```{r}
+library(mgcv)
+b1 <- gam(Yield ~ s(Longitude,Latitude),data=corn.2015.dat)
+vis.gam(b1)
+title("t.p.r.s")
+corn.2015.dat$Spline <- predict(b1)
+```
+
+```{r,fig.width=8,fig.height=4}
+par(mfrow=c(1,3))
+image(b1, Latitude ~ Longitude)
+contour(b1,Latitude ~ Longitude, image = TRUE)
+persp(b1, Latitude ~ Longitude, zlab = "Yield, Spline")
+```
+
+```{r,fig.width=3,fig.height=4}
+ggplot(corn.2015.dat, aes(Longitude,Latitude)) + 
+geom_point(aes(colour = Spline),size=1) + 
+scale_colour_gradient2(low=vermillion, mid=yellow, high=blue,midpoint = mean(corn.2015.dat$Spline)) +
+#scale_colour_gradient(low=cbPalette[8], high=cbPalette[5]) +
+labs(colour = "Residuals", x="X (m)", y="Y (m)")
+```
+
+
+## model 2 with te() smooths
+```{r}
+b2 <- gam(Yield ~ te(Longitude,Latitude),data=corn.2015.dat)
+vis.gam(b2)
+title("tensor product")
+```
+
+```{r,fig.width=8,fig.height=4}
+par(mfrow=c(1,3))
+image(b2, Latitude ~ Longitude)
+contour(b2,Latitude ~ Longitude, image = TRUE)
+persp(b2, Latitude ~ Longitude, zlab = "Yield, Poly 5")
+```
+
+## model 3 te() smooths specifying margin bases
+```{r}
+b3 <- gam(Yield ~ te(Longitude,Latitude,bs=c("tp", "tp")),data=corn.2015.dat)
+vis.gam(b3)
+title("tensor product")
+```
+
+```{r,fig.width=8,fig.height=4}
+par(mfrow=c(1,3))
+image(b3, Latitude ~ Longitude)
+contour(b3,Latitude ~ Longitude, image = TRUE)
+persp(b3, Latitude ~ Longitude, zlab = "Yield, TE")
+```
+
+
+```{r,fig.width=8,fig.height=4}
+par(mfrow=c(1,3))
+contour(b1,Latitude ~ Longitude, image = TRUE)
+contour(b2,Latitude ~ Longitude, image = TRUE)
+contour(b3,Latitude ~ Longitude, image = TRUE)
+```
+
+```{r}
+gam1 <- gam(Yield ~ s(Longitude,Latitude),data=corn.2013.dat)
+gam2 <- gam(Yield ~ s(Longitude,Latitude),data=corn.2015.dat)
+gam3 <- gam(Yield ~ s(Longitude,Latitude),data=soybean.2016.dat)
+gam4 <- gam(Yield ~ s(Longitude,Latitude),data=corn.2017.dat)
+gam5 <- gam(Yield ~ s(Longitude,Latitude),data=soybean.2018.dat)
+```
+
+```{r,fig.width=8,fig.height=8}
+par(mfrow=c(2,3))
+contour(gam1,Latitude ~ Longitude, image = TRUE)
+contour(gam2,Latitude ~ Longitude, image = TRUE)
+contour(gam3,Latitude ~ Longitude, image = TRUE)
+contour(gam4,Latitude ~ Longitude, image = TRUE)
+contour(gam5,Latitude ~ Longitude, image = TRUE)
+```
+
+
+```{r,fig.width=8,fig.height=8}
+par(mfrow=c(2,3))
+image(gam1,Latitude ~ Longitude)
+image(gam2,Latitude ~ Longitude)
+image(gam3,Latitude ~ Longitude)
+image(gam4,Latitude ~ Longitude)
+image(gam5,Latitude ~ Longitude)
+```
+
+See https://www.r-bloggers.com/r-as-gis-for-ecologists/ for plots
+https://www.r-bloggers.com/colored-3d-map/
+
+# References
+
+Seemingly unrelated regression
+

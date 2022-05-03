@@ -1,0 +1,395 @@
+---
+title: "Anisotropy"
+author: "Peter Claussen"
+date: "Jun 17, 2020"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#F0E442","#CC79A7","#000000","#734f80", "#2b5a74", "#004f39", "#787221", "#003959", "#6aaf00", "#663cd3")
+
+library(gstat)
+```
+
+# Introduction
+
+```{r}
+load(file='../ManagementZoneML/home.squares.Rda')
+```
+
+(Adapted from `cornVariogram.pdf`)
+
+Consider the covariance structure of yield observations derived from yield monitor. For simplicity, we start with a (soybean) field where the end rows and edge rows have been trimmed. We first visualize the distribution of yield samples in bushels per acre.
+
+#### 2013 Soybeans
+
+```{r}
+ggplot(home.2013.dat, aes(VRYIELDVOL)) + geom_histogram(geom="line",position="identity")
+```
+
+We might suppose that these observations are drawn from $\mathcal{N}(\mu,\sigma^2)$
+
+```{r}
+summary(home.2013.dat$VRYIELDVOL)
+mean(home.2013.dat$VRYIELDVOL)
+sd(home.2013.dat$VRYIELDVOL)
+```
+
+
+```{r}
+library(moments)
+skewness(home.2013.dat$VRYIELDVOL)
+agostino.test(home.2013.dat$VRYIELDVOL)
+kurtosis(home.2013.dat$VRYIELDVOL)
+anscombe.test(home.2013.dat$VRYIELDVOL)
+```
+
+These data do not conform to a univariate normal distribution. Some of this may be attributed to measurement error, but we also must consider that variance is not constant for the samples. Instead, we should assume that mean and variance change with position in a two-dimensional field.
+
+
+```{r,fig.width=7,fig.height=5}
+ggplot(home.2013.dat, aes(LonM,LatM)) + 
+geom_point(aes(colour = VRYIELDVOL),size=1) + 
+scale_colour_gradient(low=cbPalette[7], high=cbPalette[4]) +
+labs(colour = "Yield", x="X (m)", y="Y (m)", title = "2013")
+```
+
+# Covariance
+
+A foundational axiom of spatial statistics, attributed to Waldo Tobler
+
+> everything is related to everything else, but near things are more related than distant things.
+
+We can assess this relationship, numerically, using a semi-variogram; we'll just use a function from `gstat`
+
+```{r}
+home.2013.var <- variogram(VRYIELDVOL~1, 
+                          locations=~X+Y, 
+                          data=home.2013.dat)
+plot(home.2013.var)
+```
+
+Variance, measured with respect to linear distance between points, is maximized at about 0.0017 (GPS units) - at this range we can assume measurements are uncorrelated. Inside that range, however, these is some spatial depency among point measures, and the dependecy increases as points become closer.
+
+We would like to assume isotropy - that the spatial dependency does not depend on direction. We can inspect this by measuring variance at different angles.
+
+
+```{r}
+home.2013.var <- variogram(VRYIELDVOL~1, 
+                          locations=~X+Y, 
+                          alpha=c(0,15,30,45,60,75,90), 
+                          data=home.2013.dat)
+plot(home.2013.var)
+```
+
+This is a disturbing graphic. Variance at close range becomes very large if we measure at 30 degrees, relative to the North-South axis (alpha=0 is North, alpha=90 is in the Easterly direction).
+
+
+If we consider that samples are measured as time series, in this data moving on North-South axis, we might expect some difference in variograms measured parallel or perpendicular to the harvest axis.
+```{r}
+home.2013.var <- variogram(VRYIELDVOL~1, 
+                          locations=~X+Y, 
+                          alpha=c(0,90), 
+                          data=home.2013.dat)
+plot(home.2013.var)
+```
+
+Before we attempt to model the sources of anisotropy, we should first determine if anisotropy is common. First, for just this single field over 5 years of data (including 3 different crops)
+
+### 2015 Wheat
+
+```{r,fig.width=7,fig.height=5}
+ggplot(home.2015.dat, aes(LonM,LatM)) + 
+geom_point(aes(colour = VRYIELDVOL),size=1) + 
+scale_colour_gradient(low=cbPalette[7], high=cbPalette[4]) +
+labs(colour = "Yield", x="X (m)", y="Y (m)", title = "2015")
+```
+
+```{r}
+home.2015.var <- variogram(VRYIELDVOL~1, 
+                          locations=~X+Y,
+                          data=home.2015.dat)
+plot(home.2015.var)
+
+home.2015.var <- variogram(VRYIELDVOL~1, 
+                          locations=~X+Y, 
+                          alpha=c(0,90), 
+                          data=home.2015.dat)
+plot(home.2015.var)
+
+home.2015.var <- variogram(VRYIELDVOL~1, 
+                          locations=~X+Y, 
+                          alpha=c(0,15,30,45,60,75,90), 
+                          data=home.2015.dat)
+plot(home.2015.var)
+```
+
+```{r}
+home.2015.vgm <- fit.variogram(home.2015.var, vgm("Sph"))
+home.2015.vgm
+plot(home.2015.vgm,cutoff=0.002)
+```
+
+```{r}
+home.2015.vgm <- fit.variogram(home.2015.var, vgm("Sph",anis = c(90, 0.5)))
+home.2015.vgm
+plot(home.2015.vgm,cutoff=0.002)
+```
+
+#### 2016 Corn
+
+```{r,fig.width=7,fig.height=5}
+ggplot(home.2016.dat, aes(LonM,LatM)) + 
+geom_point(aes(colour = VRYIELDVOL),size=1) + 
+scale_colour_gradient(low=cbPalette[7], high=cbPalette[4]) +
+labs(colour = "Yield", x="X (m)", y="Y (m)", title = "2016")
+```
+
+```{r}
+home.2016.var <- variogram(VRYIELDVOL~1, 
+                          locations=~X+Y, 
+                          data=home.2016.dat)
+plot(home.2016.var)
+
+home.2016.var <- variogram(VRYIELDVOL~1, 
+                          locations=~X+Y, 
+                          alpha=c(0,90), 
+                          data=home.2016.dat)
+plot(home.2016.var)
+
+home.2016.var <- variogram(VRYIELDVOL~1, 
+                          locations=~X+Y, 
+                          alpha=c(0,15,30,45,60,75,90), 
+                          data=home.2016.dat)
+plot(home.2016.var)
+```
+
+```{r}
+home.2016.vgm <- fit.variogram(home.2016.var, vgm("Sph"))
+home.2016.vgm
+plot(home.2016.vgm,cutoff=0.002)
+```
+
+```{r}
+home.2016.vgm <- fit.variogram(home.2016.var, vgm("Sph",anis = c(0, 0.5)))
+home.2016.vgm
+plot(home.2016.vgm,cutoff=0.002)
+```
+
+#### 2017 Soybean
+
+```{r,fig.width=7,fig.height=5}
+ggplot(home.2017.dat, aes(LonM,LatM)) + 
+geom_point(aes(colour = VRYIELDVOL),size=1) + 
+scale_colour_gradient(low=cbPalette[7], high=cbPalette[4]) +
+labs(colour = "Yield", x="X (m)", y="Y (m)", title = "2017")
+```
+
+
+
+```{r}
+home.2017.var <- variogram(VRYIELDVOL~1, 
+                          locations=~X+Y, 
+                          data=home.2017.dat)
+plot(home.2017.var)
+
+home.2017.var <- variogram(VRYIELDVOL~1, 
+                          locations=~X+Y, 
+                          alpha=c(0,90), 
+                          data=home.2017.dat)
+plot(home.2017.var)
+
+home.2017.var <- variogram(VRYIELDVOL~1, 
+                          locations=~X+Y, 
+                          alpha=c(0,15,30,45,60,75,90), 
+                          data=home.2017.dat)
+plot(home.2017.var)
+```
+
+
+#### 2018 Corn
+
+```{r,fig.width=7,fig.height=5}
+ggplot(home.2018.dat, aes(LonM,LatM)) + 
+geom_point(aes(colour = VRYIELDVOL),size=1) + 
+scale_colour_gradient(low=cbPalette[7], high=cbPalette[4]) +
+labs(colour = "Yield", x="X (m)", y="Y (m)", title = "2018")
+```
+
+```{r}
+home.2018.var <- variogram(VRYIELDVOL~1, 
+                          locations=~X+Y,
+                          data=home.2018.dat)
+plot(home.2018.var)
+
+home.2018.var <- variogram(VRYIELDVOL~1, 
+                          locations=~X+Y, 
+                          alpha=c(0,90), 
+                          data=home.2018.dat)
+plot(home.2018.var)
+
+home.2018.var <- variogram(VRYIELDVOL~1, 
+                          locations=~X+Y, 
+                          alpha=c(0,15,30,45,60,75,90), 
+                          data=home.2018.dat)
+plot(home.2018.var)
+
+# see vgm for comments on anis
+```
+
+
+
+
+```{r}
+ggplot(home.2018.dat, aes(VRYIELDVOL)) + geom_histogram(geom="line",position="identity")
+
+mean(home.2018.dat$VRYIELDVOL)
+sd(home.2018.dat$VRYIELDVOL)
+
+skewness(home.2018.dat$VRYIELDVOL)
+agostino.test(home.2018.dat$VRYIELDVOL)
+kurtosis(home.2018.dat$VRYIELDVOL)
+anscombe.test(home.2018.dat$VRYIELDVOL)
+```
+
+
+# Raw Data
+
+The variograms from the raw data file kind of ugly. This may be due to the shape, or due to problems with endrows.
+
+```{r,eval=FALSE}
+harvest.dat <- read.csv(file='../ManagementZoneML/yield/AndersonsStevens Corn 2018.csv')
+
+home.raw.2013.dat <- read.csv(file='../ManagementZoneML/yield/Home Soybeans 2013.csv')
+
+home.2013.var <- variogram(VRYIELDVOL~1, 
+                          locations=~X+Y,
+                          data=home.raw.2013.dat)
+plot(home.2013.var)
+
+home.2013.var <- variogram(VRYIELDVOL~1, 
+                          locations=~X+Y, 
+                          alpha=c(0,15,30,45,60,75,90), 
+                          data=home.raw.2013.dat)
+plot(home.2013.var)
+
+home.raw.2015.dat <- read.csv(file='../ManagementZoneML/yield/Home Wheat 2015.csv')
+
+home.2015.var <- variogram(VRYIELDVOL~1, 
+                          locations=~X+Y,
+                          data=home.raw.2015.dat)
+plot(home.2013.var)
+home.2015.var <- variogram(VRYIELDVOL~1, 
+                          locations=~X+Y, 
+                          alpha=c(0,15,30,45,60,75,90), 
+                          data=home.raw.2015.dat)
+plot(home.2015.var)
+
+home.raw.2016.dat <- read.csv(file='../ManagementZoneML/yield/Home Corn 2016.csv')
+
+home.2016.var <- variogram(VRYIELDVOL~1, 
+                          locations=~X+Y,
+                          data=home.raw.2016.dat)
+plot(home.2016.var)
+home.2016.var <- variogram(VRYIELDVOL~1, 
+                          locations=~X+Y, 
+                          alpha=c(0,15,30,45,60,75,90), 
+                          data=home.raw.2016.dat)
+plot(home.2016.var)
+
+home.raw.2018.dat <- read.csv(file='../ManagementZoneML/yield/Home Corn 2018.csv')
+
+home.2018.var <- variogram(VRYIELDVOL~1, 
+                          locations=~X+Y, 
+                          alpha=c(0,15,30,45,60,75,90), 
+                          data=home.raw.2018.dat)
+plot(home.2018.var)
+```
+
+
+Generating a variogram with \verb|gstat| is straightforward; response and spatial coordinates can be specified with standard R formula, no need to create spatial instances. I have some concern that spatial objects are memory inefficient; but I've not yet taken the time to confirm that suspicion. Maybe a different exercise.
+
+```{r,eval=FALSE}
+sample.var <- variogram(YldVolDry~1, 
+                        locations=~Longitude+Latitude, 
+                        data=sample.dat)
+plot(sample.var)
+```
+
+We next fit a model the variogram, using \verb|fit.variogram|. We give an initial guess using the \verb|vgm| function. I tried several combinations, but none work well; we get a message, \verb|Warning: singular model in variogram fit|.
+
+<<>>=
+sample.vgm <- fit.variogram(sample.var, vgm(800,"Exp",0.0004,500))
+@
+
+We don't get a warning with the larger data set, so for now we'll just proceed as if the fit were satisfactory. The next step is to define grid for interpolation - these will be points where we don't have measured yields.
+
+<<>>=
+smin.lat <- min(sample.dat$Latitude)
+smax.lat <- max(sample.dat$Latitude)
+smin.lon <- min(sample.dat$Longitude)
+smax.lon <- max(sample.dat$Longitude)
+slat.rng <- smax.lat-smin.lat
+slon.rng <- smax.lon-smin.lon
+sample.grd <- expand.grid(Longitude=seq(from=smin.lon, to=smax.lon, by=slon.rng/50),
+                          Latitude=seq(from=smin.lat, to=smax.lat, by=slat.rng/50))
+@
+
+The actual kriging step is to interpolate yield values for our arbitrary points in \verb|sample.grid|, base on the original observations and using the parameters estimated from our variogram.
+
+<<>>=
+sample.krig <- krige(id="YldVolDry", 
+                     formula=YldVolDry~1, 
+                     data = sample.dat, 
+                     newdata = sample.grd, 
+                     model = sample.vgm,
+  locations=~Longitude+Latitude)
+@
+
+<<fig=TRUE,width=6,height=4>>=
+ggplot(sample.krig, aes(Longitude, Latitude)) + geom_point(aes(colour = YldVolDry.pred),size = 2)
+@
+
+\verb|gstat| allows for directional variograms. This is useful to examine the isotropy of the data. I've included 0 and 90 to estimate variograms in the main directions, plus slight offset angles to allow for a slight deviation from true north in planting direction.
+
+\begin{figure}\centering
+<<fig=TRUE,width=6,height=4>>=
+
+@
+\caption{Sample one-direction variograms}\label{sample_rot_vgm}\end{figure}
+
+Note that there is a clear difference in directions in Figure \ref{sample_rot_vgm}, suggesting anisotropy in the data. There also appears to be a periodic effect in the north-south (90) direction. This may be a result of the mixing as the harvester moves along the pass.
+
+<<fig=TRUE,width=6,height=4>>=
+sample90.var <- variogram(YldVolDry~1, 
+                          locations=~Longitude+Latitude, 
+                          alpha=c(0,90), 
+                          data=sample.dat)
+plot(sample90.var)
+@
+
+Note that including more angles alters the variograms.
+
+...
+<<>>=
+trimmed.vgm <- fit.variogram(trimmed.var, vgm(800,"Exp",0.0004,500))
+trimmed.vgm
+fit.variogram(trimmed.var, vgm(100,"Exp",0.0001,100))
+@
+
+Again, we repeat the directional variograms. 
+<<fig=TRUE,width=6,height=4>>=
+trimmed90.var <- variogram(trimmed.dat$YldVolDry~1, 
+                          locations=~Longitude+Latitude, 
+                          alpha=c(0,15,30,45,60,75,90)),  
+                          data=trimmed.dat)
+plot(trimmed90.var)
+@
+
+Again, there are differences by direction, with the relative nugget effect greater at right angles to the main axis of the pass.
+

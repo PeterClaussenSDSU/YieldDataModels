@@ -1,0 +1,262 @@
+---
+title: "Statistical Models"
+author: "Peter Claussen"
+date: "7/2/2020"
+output:
+  pdf_document: default
+  html_document: default
+bibliography: biblio.bib
+---
+
+```{r setup, include=FALSE}
+library(ggplot2)
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#F0E442","#CC79A7","#000000","#734f80", "#2b5a74", "#004f39", "#787221", "#003959", "#6aaf00", "#663cd3")
+source('./R/add.metric.R')
+source('./R/plot.gps.grids.R')
+```
+
+Yield Variance Models
+
+
+Abstract 
+A brief review and justification of formula for the random effects terms in yield data models 
+1 Notation 
+
+2 Examples 
+
+
+```{r}
+source('./R/plot.fairfield.R')
+```
+
+
+
+# Yield Monitor Data
+
+To illustrate the physical difference in the concept of *plot* as applied to yield monitor data, we will draw boundries associated with yield data points. We start with a subset of a typical yield data set, and change the names for convenience.
+```{r}
+load(file='../ManagementZoneML/home.squares.Rda')
+harvest.dat <- home.2013.dat
+# I have several data sets in this Rda, this line can be changed to quickly change the set.
+#harvest.dat <- home.2015.dat - wheat, has drainage lines
+#harvest.dat <- home.2016.dat # very uneven plot sizes
+#harvest.dat <- home.2017.dat # quite homogeneous in part of the field, but some bunching
+#harvest.dat <- home.2018.dat # similar to 2017
+
+# The column names are taken from the raw data and are a bit obscure, give them more meaningful names.
+names(harvest.dat)[4] <- 'Yield'
+names(harvest.dat)[12] <- 'Longitude'
+names(harvest.dat)[13] <- 'Latitude'
+
+# to plot only a 80m by 40m square
+#harvest.dat <- harvest.dat[harvest.dat$Longitude<80,]
+#harvest.dat <- harvest.dat[harvest.dat$Latitude<40,]
+
+# to get a similar number of plots (approximately),
+plots <- length(fairfield.dat$Yield)
+for(i in 1:200) {
+  mask <- harvest.dat$Longitude<(i*8) & harvest.dat$Latitude<i
+  if(sum(mask)>plots) {
+    break
+  }
+}
+harvest.dat <- harvest.dat[mask,]
+```
+
+We use variables from the yield monitor to determine plot dimensions. 
+
+- DISTANCE : Distance (feet) Traveled From Previous Point
+- SWATHWIDTH : Width in feet of a channel in the combine header. There are 7 channels in the data, and so we should be able to multiply this by 7, but as we see, this is not quite right. I'll have to go manually measure the width of the various headers used for harvesting different crops.
+
+We will need to convert these to metric.
+```{r}
+harvest.dat$DISTANCE <- harvest.dat$DISTANCE*0.3048
+harvest.dat$SWATHWIDTH <- harvest.dat$SWATHWIDTH*(harvest.dat$Swaths+2)*0.3048
+```
+
+We will draw out our plot area on the assumption that the `Yield` data point associated with `Longitute` and `Latitude` is the rectangle just behind that point. We use `DISTANCE` to determine to height (relative to direciton of travel) of the plot, and assume the yield GPS point is in the center of the `SWATH`. I've added a small offset to the trailing plot line prevent overlap, and will be plotting this in gray to help visualize direction of travel.
+
+```{r}
+harvest.dat$front <- harvest.dat$Latitude
+harvest.dat$rear <- harvest.dat$Latitude - harvest.dat$DISTANCE + 0.1
+harvest.dat$right <- harvest.dat$Longitude + harvest.dat$SWATHWIDTH/2
+harvest.dat$left <- harvest.dat$Longitude - harvest.dat$SWATHWIDTH/2
+```
+
+But we also need to rotate the rectangle to oriented with the direction of travel. This will be simplest, I think, if we calculate an offset from front to back and from right to left, oriented on the dirction of travel
+
+
+```{r}
+sample.dat <- harvest.dat[harvest.dat$Longitude <25,]
+sample.dat <- sample.dat[sample.dat$Latitude <8,]
+```
+
+```{r,fig.width=12,fig.height=4}
+sample.dat$DistanceAngle <- sample.dat$Heading*pi/180
+sample.dat$DistanceRise <- cos(sample.dat$DistanceAngle)*sample.dat$DISTANCE
+sample.dat$DistanceRun <- sin(sample.dat$DistanceAngle)*sample.dat$DISTANCE
+
+sample.dat$SwathAngle <- (sample.dat$Heading-90)*pi/180
+sample.dat$SwathRise <- cos(sample.dat$SwathAngle)*sample.dat$SWATHWIDTH/2
+sample.dat$SwathRun <- sin(sample.dat$SwathAngle)*sample.dat$SWATHWIDTH/2
+
+base.plot <- ggplot(sample.dat, aes(Longitude, Latitude)) + geom_point(aes(colour = Yield),size = 3) +
+  scale_colour_gradient(low=cbPalette[7], high=cbPalette[4])
+
+#front line (left to right)
+base.plot <- base.plot + geom_segment(aes(x = Longitude - SwathRun, 
+                                          xend = Longitude + SwathRun,
+                                          y = Latitude - SwathRise,
+                                          yend = Latitude + SwathRise), 
+                                      data = sample.dat,color = cbPalette[1],size = 1)
+#rear line (left to right)
+base.plot <- base.plot + geom_segment(aes(x = Longitude - SwathRun - DistanceRun, 
+                                          xend = Longitude + SwathRun - DistanceRun,
+                                          y = Latitude - DistanceRise - SwathRise,
+                                          yend = Latitude - DistanceRise + SwathRise), 
+                                      data = sample.dat,color = cbPalette[3],size = 1,linetype = "dotted")
+#right line (front to back)
+base.plot <- base.plot + geom_segment(aes(x = Longitude + SwathRun, 
+                                          xend = Longitude + SwathRun - DistanceRun,
+                                          y = Latitude + SwathRise,
+                                          yend = Latitude + SwathRise - DistanceRise), 
+                                      data = sample.dat,color = cbPalette[3],size = 1)
+#left line (front to back)
+base.plot <- base.plot + geom_segment(aes(x = Longitude - SwathRun, 
+                                          xend = Longitude - SwathRun - DistanceRun,
+                                          y = Latitude - SwathRise,
+                                          yend = Latitude - SwathRise - DistanceRise), 
+                                      data = sample.dat,color = cbPalette[3],size = 1)
+base.plot
+```
+
+
+```{r,fig.width=10,fig.height=5,eval=FALSE}
+base.plot <- ggplot(harvest.dat, aes(Longitude, Latitude)) + geom_point(aes(colour = Yield),size = 2) +
+  scale_colour_gradient(low=cbPalette[7], high=cbPalette[4])
+
+base.plot <- base.plot + geom_segment(aes(x = right, y = rear, xend = left, yend = rear), 
+                                      data = harvest.dat,color = cbPalette[1])
+base.plot <- base.plot + geom_segment(aes(x = right, y = front, xend = left, yend = front), 
+                                      data = harvest.dat,color = cbPalette[2])
+base.plot <- base.plot + geom_segment(aes(x = right, y = front, xend = right, yend = rear), 
+                                      data = harvest.dat,color = cbPalette[2])
+base.plot <- base.plot + geom_segment(aes(x = left, y = front, xend = left, yend = rear), 
+                                      data = harvest.dat,color = cbPalette[2])
+base.plot
+```
+
+\pagebreak
+
+## Generalizing
+
+
+\pagebreak
+
+### 2013
+
+```{r,fig.width=12,fig.height=4}
+names(home.2013.dat)[4] <- 'Yield'
+names(home.2013.dat)[12] <- 'Longitude'
+names(home.2013.dat)[13] <- 'Latitude'
+plot.gps.grids(home.2013.dat,plots,ratio=8,residuals=FALSE) 
+plot.gps.grids(home.2013.dat,plots,ratio=8,residuals=TRUE) 
+```
+
+
+```{r,fig.width=16,fig.height=12}
+plot.gps.grids(home.2013.dat,plots=0,ratio=8,residuals=FALSE) 
+```
+
+```{r,fig.width=24,fig.height=18}
+soybean.2013.dat <- read.csv('../ManagementZoneML/yield/Home Soybeans 2013.csv')
+soybean.2013.dat$Yield <- soybean.2013.dat$VRYIELDVOL
+soybean.2013.dat <- add.metric(soybean.2013.dat)
+plot.gps.grids(soybean.2013.dat,plots=0,residuals=FALSE) 
+```
+
+
+### 2015
+
+```{r,fig.width=12,fig.height=4}
+names(home.2015.dat)[4] <- 'Yield'
+names(home.2015.dat)[12] <- 'Longitude'
+names(home.2015.dat)[13] <- 'Latitude'
+plot.gps.grids(home.2015.dat,plots,ratio=8,residuals=TRUE) 
+```
+
+```{r,fig.width=16,fig.height=12}
+plot.gps.grids(home.2015.dat,plots=0,ratio=8,residuals=FALSE) 
+```
+
+```{r,fig.width=24,fig.height=18}
+wheat.2015.dat <- read.csv('../ManagementZoneML/yield/Home Wheat 2015.csv')
+wheat.2015.dat$Yield <- wheat.2015.dat$VRYIELDVOL
+wheat.2015.dat <- add.metric(wheat.2015.dat)
+plot.gps.grids(wheat.2015.dat,plots=0,residuals=FALSE) 
+```
+
+### 2016
+
+```{r,fig.width=12,fig.height=4}
+names(home.2016.dat)[4] <- 'Yield'
+names(home.2016.dat)[12] <- 'Longitude'
+names(home.2016.dat)[13] <- 'Latitude'
+plot.gps.grids(home.2016.dat,plots,ratio=8,residuals=FALSE) 
+```
+
+
+```{r,fig.width=16,fig.height=12}
+plot.gps.grids(home.2016.dat,plots=0,ratio=8,residuals=FALSE) 
+```
+
+```{r,fig.width=24,fig.height=18}
+corn.2016.dat <- read.csv('../ManagementZoneML/yield/Home Corn 2016.csv')
+corn.2016.dat$Yield <- corn.2016.dat$VRYIELDVOL
+corn.2016.dat <- add.metric(corn.2016.dat)
+plot.gps.grids(corn.2016.dat,plots=0,residuals=FALSE) 
+```
+
+### 2017
+
+```{r,fig.width=12,fig.height=4}
+names(home.2017.dat)[4] <- 'Yield'
+names(home.2017.dat)[12] <- 'Longitude'
+names(home.2017.dat)[13] <- 'Latitude'
+plot.gps.grids(home.2017.dat,plots,ratio=8,residuals=FALSE) 
+```
+
+```{r,fig.width=16,fig.height=12}
+plot.gps.grids(home.2017.dat,plots=0,ratio=8,residuals=FALSE) 
+```
+
+```{r,fig.width=24,fig.height=18}
+soybean.2017.dat <- read.csv('../ManagementZoneML/yield/Home Soybeans 2017.csv')
+soybean.2017.dat$Yield <- soybean.2017.dat$VRYIELDVOL
+soybean.2017.dat <- add.metric(soybean.2017.dat)
+plot.gps.grids(soybean.2017.dat,plots=0,residuals=FALSE) 
+```
+
+### 2018
+
+```{r,fig.width=12,fig.height=4}
+names(home.2018.dat)[4] <- 'Yield'
+names(home.2018.dat)[12] <- 'Longitude'
+names(home.2018.dat)[13] <- 'Latitude'
+plot.gps.grids(home.2018.dat,plots,ratio=8,residuals=FALSE) 
+```
+
+```{r,fig.width=16,fig.height=12}
+plot.gps.grids(home.2018.dat,plots=0,ratio=8,residuals=FALSE) 
+```
+
+```{r,fig.width=24,fig.height=18}
+corn.2018.dat <- read.csv('../ManagementZoneML/yield/Home Corn 2018.csv')
+corn.2018.dat$Yield <- rank(corn.2018.dat$VRYIELDVOL)
+corn.2018.dat <- add.metric(corn.2018.dat)
+plot.gps.grids(corn.2018.dat,plots=0,residuals=FALSE) 
+```
+
+
+# References
+

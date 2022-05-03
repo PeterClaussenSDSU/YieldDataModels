@@ -1,0 +1,424 @@
+---
+title: "Spatial Analysis of a Strip Trial, Trimmed"
+author: "Peter Claussen"
+date: "11/10/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(splines)
+grey <- "#999999"
+orange <- "#E69F00"
+skyblue <- "#56B4E9"
+bluishgreen <- "#009E73"
+yellow <- "#F0E442"
+blue <- "#0072B2"
+vermillion <- "#D55E00"
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#F0E442","#CC79A7","#000000","#734f80", "#2b5a74", "#004f39", "#787221", "#003959", "#6aaf00", "#663cd3")
+```
+
+```{r}
+treated.2019.dat <- read.csv(file='../ManagementZoneML/data/B 2019 Soybeans Treated.csv')
+#left = 1480 #trim more than the untrimmed
+left = 1550 #trim more than the untrimmed
+treated.2019.dat <- treated.2019.dat[treated.2019.dat$Longitude >left,]
+
+treated.2019.dat <- treated.2019.dat[treated.2019.dat$Latitude < 1180,]
+treated.2019.dat <- treated.2019.dat[treated.2019.dat$Latitude > 1000,]
+```
+
+
+```{r}
+treated.2019.dat$Pass <- treated.2019.dat$Block
+treated.2019.dat$Block <- as.factor(ceiling(treated.2019.dat$Pass/2))
+treated.2019.dat$Sprayed <- treated.2019.dat$Pass %in% c(2,4,6,8)
+```
+
+```{r}
+ggplot(treated.2019.dat, aes(x=Longitude, y=Latitude, fill=Yield)) + geom_tile(aes(fill = Yield)) + scale_fill_continuous(type = "viridis")
+```
+  
+  
+```{r}
+treated.2019.dat$SprayedRank <- rank(treated.2019.dat$Sprayed)
+treated.2019.dat$SprayedRank <- treated.2019.dat$SprayedRank/max(treated.2019.dat$SprayedRank)
+
+treated.2019.dat$YieldRank <- rank(treated.2019.dat$Yield)
+treated.2019.dat$YieldRank <- treated.2019.dat$YieldRank/max(treated.2019.dat$YieldRank)
+
+MapsSprayed <- data.frame(Longitude=c(treated.2019.dat$Longitude,
+                                treated.2019.dat$Longitude),
+                   Latitude=c(treated.2019.dat$Latitude,
+                              treated.2019.dat$Latitude),
+                   Value=c(treated.2019.dat$SprayedRank,
+                           treated.2019.dat$YieldRank),
+                   Map=c(rep('Spray',length(treated.2019.dat$SprayedRank)),
+                         rep('Yield',length(treated.2019.dat$YieldRank))))
+ggplot(MapsSprayed, aes(Longitude,Latitude)) + 
+geom_point(aes(colour = Value),size=1) + 
+scale_colour_gradient2(low=vermillion, mid=yellow, high=blue, midpoint = 0.5) +
+labs(colour = "Relative Rank", x="Easting", y="Northing", title = "Strip Trial") + facet_wrap(~ Map)
+```
+
+```{r}
+ggplot(treated.2019.dat, aes(x=Yield)) + geom_histogram()
+ggplot(treated.2019.dat, aes(sample = Yield)) + stat_qq() + stat_qq_line()
+treated.2019.dat <- treated.2019.dat[treated.2019.dat$Yield<80,]
+#exlcude zero or near zero
+#treated.2019.dat <- treated.2019.dat[treated.2019.dat$Yield>1,]
+ggplot(treated.2019.dat, aes(x=Yield)) + geom_histogram()
+ggplot(treated.2019.dat, aes(sample = Yield)) + stat_qq() + stat_qq_line()
+```
+
+```{r}
+MapsSprayed <- data.frame(Longitude=c(treated.2019.dat$Longitude,
+                                treated.2019.dat$Longitude),
+                   Latitude=c(treated.2019.dat$Latitude,
+                              treated.2019.dat$Latitude),
+                   Value=c(treated.2019.dat$SprayedRank,
+                           treated.2019.dat$YieldRank),
+                   Map=c(rep('Spray',length(treated.2019.dat$SprayedRank)),
+                         rep('Yield',length(treated.2019.dat$YieldRank))))
+ggplot(MapsSprayed, aes(Longitude,Latitude)) + 
+geom_point(aes(colour = Value),size=1) + 
+scale_colour_gradient2(low=vermillion, mid=yellow, high=blue, midpoint = 0.5) +
+labs(colour = "Relative Rank", x="Easting", y="Northing", title = "Strip Trial") + facet_wrap(~ Map)
+```
+
+# Deterministic models
+
+## Natural splines
+```{r}
+models=12
+models.ns.lm <- vector(mode='list',length=models)
+ns.dat <- NULL
+for(i in 1:length(models.ns.lm)) {
+  tmp.dat <- treated.2019.dat[,c('Longitude','Latitude','Yield','Sprayed')]
+  #models.lm[[i]] <- lm(Yield ~ polym(Easting,degree=1+2*(i-1))*polym(Northing,degree=1+2*(i-1))+Sprayed,
+  #                     data=Strips.dat)
+
+  models.ns.lm[[i]] <- lm(Yield ~ Sprayed + ns(Longitude,df=1+2*(i-1))*ns(Latitude,df=1+2*(i-1)), data=tmp.dat)
+  tmp.dat$Yield <- predict(models.ns.lm[[i]])
+  tmp.dat$DF = 1+2*(i-1)
+  ns.dat <- rbind(ns.dat, tmp.dat)
+ 
+}
+selection.dat <- data.frame(Degree = rep(3+2*(1:models-1),4),
+                            Criteria = as.factor(c(rep('logLik',models),
+                                                   rep('AIC',models),
+                                                   rep('BIC',models),
+                                                   rep('beta',models))),
+                            Score = c(unlist(lapply(models.ns.lm,logLik)),
+                                      unlist(lapply(models.ns.lm,AIC)),
+                                      unlist(lapply(models.ns.lm,BIC)),
+                                      unlist(lapply(models.ns.lm,function(x){coef(x)[2]}))
+                                      ))
+ggplot(selection.dat, aes(Degree,Score)) + 
+geom_point(aes(colour = Criteria),size=2) + 
+  geom_line(aes(colour = Criteria),size=1) + 
+ scale_colour_manual(values=cbPalette) + facet_wrap(~Criteria,nrow=3,scales="free_y")
+```
+
+```{r,fig.width=9,fig.height=6}
+ggplot(ns.dat, aes(Longitude,Latitude)) + 
+geom_point(aes(colour = Yield),size=1) + 
+scale_colour_gradient2(low=vermillion, mid=yellow, high=blue,midpoint = mean(ns.dat$Yield)) +
+#scale_colour_gradient(low=cbPalette[8], high=cbPalette[5]) +
+labs(colour = "Lm with natural spline", x="Easting", y="Northing") + facet_wrap(~ DF)
+```
+
+```{r}
+models.bs.lm <- vector(mode='list',length=models)
+bs.dat <- NULL
+for(i in 1:length(models.bs.lm)) {
+  tmp.dat <- treated.2019.dat[,c('Longitude','Latitude','Yield','Sprayed')]
+  #models.lm[[i]] <- lm(Yield ~ polym(Easting,degree=1+2*(i-1))*polym(Northing,degree=1+2*(i-1))+Sprayed,
+  #                     data=Strips.dat)
+
+  models.bs.lm[[i]] <- lm(Yield ~ Sprayed + bs(Longitude,df=3+2*(i-1))*bs(Latitude,df=3+2*(i-1)), data=tmp.dat)
+  tmp.dat$Yield <- predict(models.bs.lm[[i]])
+  tmp.dat$DF = 3+2*(i-1)
+  bs.dat <- rbind(bs.dat, tmp.dat)
+ 
+}
+selection.dat <- data.frame(Degree = rep(3+2*(1:models-1),4),
+                            Criteria = as.factor(c(rep('logLik',models),
+                                                   rep('AIC',models),
+                                                   rep('BIC',models),
+                                                   rep('beta',models))),
+                            Score = c(unlist(lapply(models.bs.lm,logLik)),
+                                      unlist(lapply(models.bs.lm,AIC)),
+                                      unlist(lapply(models.bs.lm,BIC)),
+                                      unlist(lapply(models.bs.lm,function(x){coef(x)[2]}))
+                                      ))
+ggplot(selection.dat, aes(Degree,Score)) + 
+geom_point(aes(colour = Criteria),size=2) + 
+  geom_line(aes(colour = Criteria),size=1) + 
+ scale_colour_manual(values=cbPalette) + facet_wrap(~Criteria,nrow=3,scales="free_y")
+```
+
+```{r,fig.width=9,fig.height=6}
+ggplot(bs.dat, aes(Longitude,Latitude)) + 
+geom_point(aes(colour = Yield),size=1) + 
+scale_colour_gradient2(low=vermillion, mid=yellow, high=blue,midpoint = mean(bs.dat$Yield)) +
+#scale_colour_gradient(low=cbPalette[8], high=cbPalette[5]) +
+labs(colour = "Lm with b-spline", x="Easting", y="Northing") + facet_wrap(~ DF)
+```
+
+
+```{r}
+library(mgcv)
+library(gstat)
+k.vec = 20*(1:models)
+models.gam <- vector(mode='list',length=length(k.vec))
+gam.dat <- NULL
+
+Variograms <- vector(length(k.vec),mode='list')
+Residuals <- vector(length(k.vec),mode='list')
+
+Variogram.dat <- NULL
+Residuals.dat <- NULL
+par(mfrow=c(4,4))
+for(i in 1:length(k.vec)) {
+  tmp.dat <- treated.2019.dat[,c('Longitude','Latitude','Yield','Sprayed')]
+
+  models.gam[[i]] <- gam(Yield ~ Sprayed + s(Longitude,Latitude,k=k.vec[i]),data=tmp.dat)
+  plot(models.gam[[i]])
+  tmp.dat$Yield <- predict(models.gam[[i]])
+  tmp.dat$K = k.vec[i]
+  gam.dat <- rbind(gam.dat, tmp.dat)
+   tmp.dat$residuals <- residuals(models.gam[[i]])
+   
+  tmp.var <- variogram(Yield~1, 
+                          locations=~Longitude+Latitude,
+                          #alpha=c(0,45,90),
+                          data=tmp.dat)
+  Variograms[[i]] <- tmp.var
+  #extract variogram values
+  Variogram.dat <- rbind(Variogram.dat,
+                         data.frame(Distance=tmp.var$dist,
+                                    Gamma=tmp.var$gamma,
+                                    K=k.vec[i]))
+  
+  tmp.var <- variogram(residuals~1, 
+                          locations=~Longitude+Latitude,
+                          #alpha=c(0,45,90),
+                          data=tmp.dat)
+  Residuals.dat <- rbind(Residuals.dat,
+                         data.frame(Distance=tmp.var$dist,
+                                    Gamma=tmp.var$gamma,
+                                    K=k.vec[i]))
+  Residuals[[i]] <- tmp.var
+  
+}
+selection.dat <- data.frame(K = rep(k.vec,4),
+                            Criteria = as.factor(c(rep('Deviance',models), #'logLik',models),
+                                                   rep('AIC',models),
+                                                   rep('BIC',models),
+                                                   rep('Beta',models))),
+                            Score = c(unlist(lapply(models.gam,function(x){summary(x)$dev.expl})),#logLik)),
+                                      unlist(lapply(models.gam,AIC)),
+                                      unlist(lapply(models.gam,BIC)),
+                                      unlist(lapply(models.gam,function(x){coef(x)[2]}))
+                                      
+                                      ))
+ggplot(selection.dat, aes(K,Score)) + 
+geom_point(aes(colour = Criteria),size=2) + 
+  geom_line(aes(colour = Criteria),size=1) + 
+ scale_colour_manual(values=cbPalette) + facet_wrap(~Criteria,nrow=3,scales="free_y")
+```
+```{r}
+Variogram.dat$K <- factor(Variogram.dat$K )
+ggplot(Variogram.dat, aes(Distance,Gamma)) + 
+geom_point(aes(colour = K),size=2) + 
+  #geom_line(aes(colour = K),size=1) + 
+   geom_smooth(aes(group = K,color=K),
+           #   method="nls", 
+          #    formula=y~exp(-x/tau), # this is an nls argument,
+          #   method.args = list(start=c(tau=10000)),
+              se=FALSE) +
+ scale_colour_manual(values=c(cbPalette,cbPalette))
+```
+
+```{r}
+Residuals.dat$K <- factor(Residuals.dat$K )
+ggplot(Residuals.dat, aes(Distance,Gamma)) + 
+geom_point(aes(colour = K),size=2) + 
+  geom_smooth(aes(group = K,color=K),
+ #geom_smooth(method="nls", 
+#              formula=y~1+exp(-x/tau), # this is an nls argument,
+#             method.args = list(start=c(tau=.01)),
+              se=FALSE) +
+ scale_colour_manual(values=c(cbPalette,cbPalette))
+```
+
+```{r}
+Residuals.dat$K <- factor(Residuals.dat$K)
+ggplot(Residuals.dat, aes(Distance,Gamma)) + 
+geom_point(aes(colour = K),size=2) + 
+  geom_smooth(aes(group = K,color=K),method='lm',
+              se=FALSE) +
+ scale_colour_manual(values=c(cbPalette,cbPalette))
+```
+
+
+```{r}
+Slopes.dat <- data.frame(K=unique(Residuals.dat$K))
+Slopes.dat$Intercept <- 0
+Slopes.dat$Slope <- 0
+
+for (k in 1:length(Slopes.dat$K)) {
+  K <- Slopes.dat$K[k]
+  tmp.lm <- lm(Gamma ~ Distance,data=Residuals.dat[Residuals.dat$K==K,])
+  Slopes.dat$Intercept[k] <- coef(tmp.lm)[1]
+  Slopes.dat$Slope[k] <- coef(tmp.lm)[2]
+  print(summary(lm(Gamma ~ Distance,data=Residuals.dat[Residuals.dat$K==K,])))
+}
+Slopes.dat
+res.lm <- lm(Gamma ~ K:Distance,data=Residuals.dat)
+summary(res.lm)
+summary(lm(Gamma ~ Distance + K:Distance,data=Residuals.dat))
+summary(lm(Gamma ~ 0 + K:Distance,data=Residuals.dat))
+```
+
+
+```{r,fig.width=9,fig.height=6}
+ggplot(gam.dat, aes(Longitude,Latitude)) + 
+geom_point(aes(colour = Yield),size=1) + 
+scale_colour_gradient2(low=vermillion, mid=yellow, high=blue,midpoint = mean(gam.dat$Yield)) +
+#scale_colour_gradient(low=cbPalette[8], high=cbPalette[5]) +
+labs(colour = "GAM", x="Easting", y="Northing") + facet_wrap(~ K)
+```
+
+```{r}
+T19.gam <- gam(Yield ~ s(Longitude,Latitude,k=180)+Sprayed,data=treated.2019.dat)
+gam.check(T19.gam)
+reml.gam <- gam(Yield ~ s(Longitude,Latitude,k=180)+Sprayed,data=treated.2019.dat,method = "REML")
+gam.check(reml.gam )
+null.gam <- gam(Yield ~ s(Longitude,Latitude,k=180),data=treated.2019.dat)
+gam.check(null.gam)
+
+anova(null.gam)
+anova(null.gam,T19.gam)
+
+summary(T19.gam)
+summary(reml.gam)
+summary(null.gam)
+anova(T19.gam)
+plot(null.gam)
+plot(T19.gam)
+```
+
+
+
+```{r,eval=FALSE}
+treated.2019.dat$G180R <- rank(treated.2019.dat$G180)
+treated.2019.dat$G180R <- treated.2019.dat$G180R/max(treated.2019.dat$G180R)
+ggplot(treated.2019.dat, aes(Longitude,Latitude)) + 
+geom_point(aes(colour = G180R),size=1) + 
+scale_colour_gradient2(low=vermillion, mid=yellow, high=blue,midpoint = mean(treated.2019.dat$G180R)) +
+labs(colour = "Predicted GAM 120", x="Easting", y="Northing", title = "Treated Model")
+```
+
+
+```{r,eval=FALSE}
+install.packages("INLA",repos=c(getOption("repos"),INLA="https://inla.r-inla-download.org/R/testing"), dep=TRUE)
+inla.upgrade()
+inla.upgrade(testing=TRUE)
+#from git
+# R CMD INSTALL --build rinla
+```
+
+```{r,eval=FALSE}
+m <- 50
+points <- matrix(runif(m * 2), m, 2)
+
+mesh.2019 <- inla.mesh.2d(loc=treated.2019.dat[,c('Longitude','Latitude')],
+                           max.edge = c(0.05, 0.5))
+mesh <- inla.mesh.2d(loc = points, cutoff = 0.05, offset = c(0.1, 0.4),
+  max.edge = c(0.05, 0.5))
+```
+
+# MCMC/Bayesian Methods
+
+## Stan models
+
+```{r}
+library(brms)
+if(!file.exists('Stan Trimmed.Rda')) {
+  fit.brms <- brm(Yield ~ Sprayed + s(Longitude,Latitude),data=treated.2019.dat)
+  brms180 <- brm(Yield ~ Sprayed + s(Longitude,Latitude,k=120),data=treated.2019.dat)
+  save(fit.brms,brms180,file='Stan Trimmed.Rda')
+} else {
+  load(file='Stan Trimmed.Rda')
+}
+
+summary(brms180)
+plot(brms180)
+summary(fit.brms)
+plot(fit.brms)
+```
+
+```{r}
+brms.dat <- treated.2019.dat[,c('Longitude','Latitude','Yield','Sprayed')]
+brms.dat$Estimate <- predict(brms180)[,1]
+brms.dat$K=120
+
+tmp.dat <- treated.2019.dat[,c('Longitude','Latitude','Yield','Sprayed')]
+tmp.dat$Estimate <- predict(fit.brms)[,1]
+tmp.dat$K=0
+brms.dat <- rbind(brms.dat, tmp.dat)
+```
+
+```{r,fig.width=6,fig.height=4}
+ggplot(brms.dat, aes(Longitude,Latitude)) + 
+geom_point(aes(colour = Estimate),size=1) + 
+scale_colour_gradient2(low=vermillion, mid=yellow, high=blue,midpoint = mean(brms.dat$Estimate)) +
+#scale_colour_gradient(low=cbPalette[8], high=cbPalette[5]) +
+labs(colour = "STAN", x="Easting", y="Northing") + facet_wrap(~ K)
+```
+
+spatialfusion
+```{r,eval=FALSE}
+library(spatialfusion)
+## example based on simulated data
+dat <- fusionSimulate(n.point = 20, n.area = 10, n.grid = 2, psill = 1, phi = 1, nugget = 0, tau.sq = 0.5,
+point.beta = list(rbind(1,5)), area.beta = list(rbind(-1, 0.5)), distributions = c("normal","poisson"), design.mat = matrix(c(1,1,1)))
+geo_data <- data.frame(x = dat$mrf[dat$sample.ind, "x"], y = dat$mrf[dat$sample.ind, "y"], cov.point = dat$data$X_point[,2],
+outcome = dat$data$Y_point[[1]]) lattice_data <- sp::SpatialPolygonsDataFrame(dat$poly,
+data.frame(outcome = dat$data$Y_area[[1]], cov.area = dat$data$X_area[,2]))
+dat_stan <- fusionData(geo.data = geo_data, geo.formula = outcome ~ cov.point, lattice.data = lattice_data, lattice.formula = outcome ~ cov.area,
+pp.data = dat$data$lgcp.coords[[1]], distributions = c("normal","poisson"), method = "Stan")
+mod_stan <- fusion(data = dat_stan, n.latent = 1, bans = 0, pp.offset = 1,
+prior.phi = list(distr = "normal", pars = c(1, 10))) summary(mod_stan)
+```
+
+piepho-11-2011
+
+```{r}
+te.gam <- gam(Yield ~ te(Longitude,Latitude)+Sprayed,data=treated.2019.dat)
+summary(te.gam)
+ti.gam <-gam(Yield ~ ti(Longitude,Latitude)+Sprayed,data=treated.2019.dat)
+summary(ti.gam)
+tp.gam <-gam(Yield ~ s(Longitude,Latitude,bs = 'tp',k=180)+Sprayed,data=treated.2019.dat)
+summary(tp.gam)
+#only handles 1D
+#summary(gam(Yield ~ s(Longitude,Latitude,bs = 'cs')+Sprayed,data=treated.2019.dat))
+re.gam <-gam(Yield ~ s(Longitude,Latitude,bs = 're',k=180)+Sprayed,data=treated.2019.dat)
+summary(re.gam)
+#error
+#summary(gam(Yield ~ s(Longitude,Latitude,bs = 'mrf')+Sprayed,data=treated.2019.dat))
+gp.gam <-gam(Yield ~ s(Longitude,Latitude,bs = 'gp',k=180)+Sprayed,data=treated.2019.dat)
+summary(gp.gam)
+ad.gam <-gam(Yield ~ s(Longitude,Latitude,bs = 'ad')+Sprayed,data=treated.2019.dat)
+summary(ad.gam)
+
+plot(te.gam)
+plot(ti.gam)
+plot(tp.gam)
+plot(re.gam)
+plot(gp.gam)
+plot(ad.gam)
+```

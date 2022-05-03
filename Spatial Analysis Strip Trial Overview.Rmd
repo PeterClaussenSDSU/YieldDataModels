@@ -1,0 +1,324 @@
+---
+title: "Spatial Analysis of a Strip Trial - Overview"
+author: "Peter Claussen"
+date: "11/10/2020"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+#piepho-11-2011
+models=12
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(mgcv)
+grey <- "#999999"
+orange <- "#E69F00"
+skyblue <- "#56B4E9"
+bluishgreen <- "#009E73"
+yellow <- "#F0E442"
+blue <- "#0072B2"
+vermillion <- "#D55E00"
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#F0E442","#CC79A7","#000000","#734f80", "#2b5a74", "#004f39", "#787221", "#003959", "#6aaf00", "#663cd3")
+```
+
+
+
+See Spatial Analysis of a Strip Trial. This duplicates much of the code, but using data from the 2ASA_CSSA_SSSA/2018/ThoughtsAboutPower
+# Introduction
+
+We use as a motivating example a simple but common split-planter strip trial, as described and analyzed (e.g. [FunctionalAnalysisStripTrialsOverview.Rmd](FunctionalAnalysisStripTrialsOverview.pdf). The functional data analysis approach outlined previously includes only one spatial dimension. We improve upon this analysis by including spatial information in two dimensions. However, the method outlined here provides a single estimate of yield difference among two varieties, accounting for spatial variability as a nuisance parameter. It does not provide information about the interaction of yield differences with spatial variability.
+
+We will note, for reference later, that the univariate analysis in `FunctionalAnalysisStripTrialsOverview.pdf` suggests a variety difference on the order of 15 bu/acre.
+
+As previously we show both seeding and yield maps.
+
+```{r,echo=FALSE}
+library(ggplot2)
+library(gridExtra)
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#F0E442","#CC79A7","#000000","#734f80", "#2b5a74", "#004f39", "#787221", "#003959", "#6aaf00", "#663cd3")
+grey <- cbPalette[1] #"#999999"
+orange <- cbPalette[2] #"#E69F00"
+skyblue <- cbPalette[3] #"#56B4E9"
+bluishgreen <- cbPalette[4] #"#009E73"
+yellow <- cbPalette[7] #"#F0E442"
+blue <- cbPalette[5] #"#0072B2"
+vermillion <- cbPalette[6] #"#D55E00"
+pair.colors <- c(2,5)
+```
+
+```{r,echo=FALSE}
+load(file="~/Work/git/ASA_CSSA_SSSA/2017/Workshop/Case Study 2/Strips.Rda")
+```
+
+
+```{r,EastQuarterMaps,echo=FALSE,fig.width=8,fig.height=6}
+grid.arrange(
+  arrangeGrob(
+        ggplot(EastQuarter.dat, aes(Easting,Northing)) + 
+           geom_point(aes(colour = Product),size=2) + 
+           scale_colour_manual(values=cbPalette[pair.colors]) +
+           #scale_colour_manual(values=cbPalette[pair.colors]) +
+           labs(colour = "Variety", x="Easting", y="Northing", title = "Seeding Map"),
+    ggplot(EastQuarter.dat, aes(Easting,Northing)) + 
+           geom_point(aes(colour = Yield),size=2) + 
+           scale_colour_gradient2(low=vermillion, mid=yellow, high=blue, midpoint = median(EastQuarter.dat$Yield)) +
+           labs(colour = "Yield", x="Easting", y="Northing",title="Harvest Map"),
+    nrow=2
+  )
+)
+```
+
+In general, our model takes the form
+
+$$
+y(\mathbf{s}) = V(\mathbf{s}) + \mu(\mathbf{s},k) + e(\mathbf{s})
+$$
+where our response $y$ is a function of the variety planted and the expected yield response. Since these are geospatial data, we index using a pair of spatial coordinates $\mathbf{s}=\{Easting,Northing\}$, where Easting and Northing are distances, in meters, from the southwest corner of the cropland.
+
+We will consider three classes of computation methods for approximating $\mu(\mathbf{s},k)$, linear models with spline functions, generalized additive models with default smoothing functions and a Bayesian model with splines and default (non-informative) priors. The models allow for differing smoothness, which we represent here with a generic parameter $k$ that is applied uniformly in both longitudinal and latitudinal directions.
+
+```{r,echo=FALSE}
+source('./R/remove.harvest.outliers.fn.R')
+source('./R/spatial.model.selection.R')
+source('./R/select.best.variogram.R')
+source('./R/spatial.selection.plots.R')
+source('./R/read.yield.data.R')
+source('./R/combined.map.R')
+```
+
+# Linear and GAM
+
+```{r,echo=FALSE}
+if(file.exists('ProductFixed.bs.Rda')) {
+  load(file='ProductFixed.bs.Rda')
+} else {
+  ModelsFixed.bs <- spatial.model.selection(EastQuarter.dat,
+                                         fixed='Product',
+                                         range=c(3,35),
+                                         method='bs',
+                                         models=12)
+ 
+  ModelsFixed.gam <- spatial.model.selection(EastQuarter.dat,
+                                         fixed='Product',
+                                         range=c(10,120),
+                                         method='gam',
+                                         models=12) 
+  save(ModelsFixed.bs,ModelsFixed.gam,
+       file='ProductFixed.bs.Rda')
+}
+
+Plots.bs <- spatial.selection.plots(ModelsFixed.bs)
+Plots.gam <- spatial.selection.plots(ModelsFixed.gam)
+```
+
+Methods for choosing optimal smoothers are discussed in other documents, but we review them briefly here. How to determine the best smoothing function? We consider first the variogram. 
+
+Briefly, a variogram shows the degree of variance between measures taken at two points, where variance is taken as a measure of similarity. If the points are near to each other, variance will be low, while variance is expected to be high at points far away. Thus, the variogram forms an asymptotic curve, moving from left to right.
+
+In the ideal variogram, points that overlap (that is, where distance is 0) will have perfect correlation, with a corresponding 0 value of the variogram at 0. However, when the data are noisy, there will still be some variance even at very close points. The value of the variogram at 0 is termed the nugget (for historical reasons, not relevant here). The ideal variogram also assumes spatial correlations are present - near points are more alike that far points.
+
+This suggests a method for selecting the best smoothing model. We decompose yield data into model predictions and residuals. We choose the model whose prediction most closely produce a ideal variogram, while leaving residuals that most nearly resemble a white noise process. To choose the smoothing parameter that most closely matches an ideal variogram, we test the value of the variogram at 0, and find the simplest smoothing model such that the intercept of the variogram is not different from 0. To choose residuals that are most like white noise, we conside the slope of the variogram - since white noise processes are independent of distance, we look for a residual variogram whose line of best fit approaches a slope of 0.
+
+## Linear Model with Natural Splines
+
+For simplicity, we first illustrate the method with a linar model using natrual splines as smoothing functions. The figure below show variograms, predictions and residuals, for 12 different degrees of local smoothing.
+
+```{r,echo=FALSE,fig.width=8,fig.height=4}
+print(Plots.bs$Variogram)
+```
+
+We also consider for model selection traditional criteria AIC and BIC. The figure below show AIC and BIC for different smoothing models, along with plots of p-values for the nugget (from the associated prediction variograms) and slopes of residual variograms.
+
+```{r,echo=FALSE,fig.width=8,fig.height=4}
+print(Plots.bs$Selection)
+```
+
+As we see in the preceding graph, AIC continues to improve with increasing model degrees of freedom - AIC does not select a smooth model. In contrast, for these data, BIC suggests a model with approximately 15-16 d.f. for the `bs` smoothing parameter. 
+
+Using a non-zero nugget, we might choose a smoothing parameter of 8 for these data, while the slope of the residuals suggest a parameter of approximately 26. For now, we'll concentrate on comparing the smoothers 8 and 16 - we might prefer the simplest possible model. We fit and analyse in R as below:
+
+
+```{r}
+library(splines)
+product.bs.8.lm <- lm(Yield ~ Product + bs(Longitude,df=8)*bs(Latitude,df=8), data=EastQuarter.dat)
+product.bs.16.lm <- lm(Yield ~ Product + bs(Longitude,df=16)*bs(Latitude,df=16), data=EastQuarter.dat)
+product.bs.26.lm <- lm(Yield ~ Product + bs(Longitude,df=26)*bs(Latitude,df=26), data=EastQuarter.dat)
+anova(product.bs.8.lm)
+anova(product.bs.16.lm)
+#anova(product.bs.26.lm)
+head(coef(product.bs.8.lm))
+head(coef(product.bs.16.lm))
+#this gives us an unreasonably large treatment difference
+head(coef(product.bs.26.lm))
+```
+
+Both models suggest significant differences between yields for the two varieties, but the estimates of the yield difference are different, approximately 13 bu/acre for the smoother data, and approximately 20 bu/acre for the less smooth data. We visualize the difference in the predictions from the two models below.
+
+## Linear Model with Natural Splines Predicted Yield
+
+```{r,echo=FALSE}
+bs.dat <- NULL
+tmp.dat <- EastQuarter.dat[,c('Longitude','Latitude','Yield','Product')]
+tmp.dat$Yield <- predict(product.bs.8.lm)
+tmp.dat$DF = 8
+bs.dat <- rbind(bs.dat, tmp.dat)
+tmp.dat$Yield <- predict(product.bs.16.lm)
+tmp.dat$DF = 16
+bs.dat <- rbind(bs.dat, tmp.dat)
+```
+
+```{r,echo=FALSE,fig.width=8,fig.height=6}
+ggplot(bs.dat, aes(Longitude,Latitude)) + 
+  geom_point(aes(colour = Yield),size=1) + 
+  scale_colour_gradient2(low=vermillion, mid=yellow, high=blue,midpoint = mean(bs.dat$Yield)) +
+  labs(main='Linear Model with Natural Splines',colour = "Predicted Yield", x="Easting", y="Northing") + facet_wrap(~ DF,ncol=1)
+```
+
+## GAM model
+
+We repeat the analysis from above, but using `gam` as the computational engine.
+```{r}
+print(Plots.gam)
+
+```
+
+```{r}
+library(mgcv)
+product.gam.lm <- gam(Yield ~ Product + s(Longitude,Latitude),data=EastQuarter.dat)
+
+product.gam.40.lm <- gam(Yield ~ Product + s(Longitude,Latitude,k=40),data=EastQuarter.dat)
+product.gam.65.lm <- gam(Yield ~ Product + s(Longitude,Latitude,k=65),data=EastQuarter.dat)
+product.gam.269.lm <- gam(Yield ~ Product + s(Longitude,Latitude,k=269),data=EastQuarter.dat)
+summary(product.gam.lm)
+summary(product.gam.40.lm)
+summary(product.gam.65.lm)
+summary(product.gam.269.lm)
+```
+
+```{r}
+anova(product.gam.lm)
+anova(product.gam.40.lm)
+anova(product.gam.65.lm)
+anova(product.gam.269.lm)
+```
+
+
+```{r}
+head(coef(product.gam.lm))
+head(coef(product.gam.40.lm))
+head(coef(product.gam.65.lm))
+head(coef(product.gam.269.lm))
+```
+
+Unlike linear models with natural splines, the two smoothing coefficients selected for GAM fitting produce similar estimates for variety differences - about 13 bu/acre.
+
+## GAM Predicted Yield
+
+head(coef(product.gam.lm))
+head(coef(product.gam.40.lm))
+head(coef(product.gam.65.lm))
+head(coef(product.gam.269.lm))
+
+```{r,echo=FALSE}
+gam.dat <- NULL
+tmp.dat <- EastQuarter.dat[,c('Longitude','Latitude','Yield','Product')]
+tmp.dat$Yield <- predict(product.gam.lm)
+tmp.dat$DF = 0
+gam.dat <- rbind(gam.dat, tmp.dat)
+tmp.dat$Yield <- predict(product.gam.40.lm)
+tmp.dat$DF = 40
+gam.dat <- rbind(gam.dat, tmp.dat)
+tmp.dat$Yield <- predict(product.gam.65.lm)
+tmp.dat$DF = 65
+gam.dat <- rbind(gam.dat, tmp.dat)
+
+tmp.dat$Yield <- predict(product.gam.269.lm)
+tmp.dat$DF = 269
+gam.dat <- rbind(gam.dat, tmp.dat)
+
+```
+
+```{r,echo=FALSE,fig.width=10,fig.height=6}
+ggplot(gam.dat, aes(Longitude,Latitude)) + 
+  geom_point(aes(colour = Yield),size=1) + 
+  scale_colour_gradient2(low=vermillion, mid=yellow, high=blue,midpoint = mean(bs.dat$Yield)) +
+  labs(colour = "Predicted Yield", x="Easting", y="Northing") + facet_wrap(~ DF,ncol=2)
+```
+
+
+
+```{r,eval=FALSE,echo=FALSE}
+install.packages("INLA",repos=c(getOption("repos"),INLA="https://inla.r-inla-download.org/R/stable"), dep=TRUE)
+
+#install.packages("INLA",repos=c(getOption("repos"),INLA="https://inla.r-inla-download.org/R/testing"), dep=TRUE)
+#inla.upgrade()
+#inla.upgrade(testing=TRUE)
+#from git
+# R CMD INSTALL --build rinla
+```
+
+```{r,eval=FALSE,echo=FALSE}
+library(INLA)
+m <- 50
+points <- matrix(runif(m * 2), m, 2)
+
+mesh.2019 <- inla.mesh.2d(loc=EastQuarter.dat[,c('Longitude','Latitude')],
+                          max.edge = c(0.05, 0.5))
+mesh <- inla.mesh.2d(loc = points, cutoff = 0.05, offset = c(0.1, 0.4),
+                     max.edge = c(0.05, 0.5))
+```
+
+# MCMC/Bayesian Methods
+
+We use STAN to fit a spatial model using Bayesian methods. I'm still exploring these methods, so the results are presented without comment. I will note, though, that these methods produce similar yield difference estimates, ~12 bu/acre, as with the GAM models.
+
+```{r,eval=TRUE,echo=FALSE}
+library(brms)
+if(!file.exists('StanEastQuarter.Rda')) {
+  fit.brms <- brm(Yield ~ Product + s(Longitude,Latitude),data=EastQuarter.dat)
+  save(fit.brms,file='StanEastQuarter.Rda')
+  brms140 <- brm(Yield ~ Product + s(Longitude,Latitude,k=140),data=EastQuarter.dat)
+  save(fit.brms,brms140,file='StanEastQuarter.Rda')
+  brms260 <- brm(Yield ~ Product + s(Longitude,Latitude,k=260),data=EastQuarter.dat)
+  save(fit.brms,brms140,brms260,file='StanEastQuarter.Rda')
+} else {
+  load(file='StanEastQuarter.Rda')
+}
+
+summary(fit.brms)
+#plot(fit.brms)
+
+summary(brms140)
+#plot(brms140)
+
+summary(brms260)
+#plot(brms260)
+```
+
+
+
+```{r}
+Coef.bs.dat <- NULL
+Coef.gam.dat <- NULL
+
+Selection.bs <- ModelsFixed.bs$Selection
+Selection.bs$Estimate <- NA
+idx <- 1
+for(model in ModelsFixed.bs$Models) {
+  Selection.bs$Estimate[idx] <- coef(model)[2]
+  idx <- idx+1
+}
+plot(Selection.bs$Estimate,xlim = c(0,12))
+
+Selection.gam <- ModelsFixed.gam$Selection
+Selection.gam$Estimate <- NA
+idx <- 1
+for(model in ModelsFixed.gam$Models) {
+  Selection.gam$Estimate[idx] <- coef(model)[2]
+  idx <- idx+1
+}
+points(Selection.gam$Estimate,col='red')
+Selection.gam
+```

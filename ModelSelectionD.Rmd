@@ -1,0 +1,219 @@
+---
+title: "Field D Model Selection"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+#theme_set(theme_dag())
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+
+library(mgcv)
+library(splines)
+library(gstat)
+library(ape)
+
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#F0E442","#CC79A7","#000000","#734f80", "#2b5a74", "#004f39", "#787221", "#003959", "#6aaf00", "#663cd3")
+
+vermillion <- "#D55E00"
+yellow <- "#F0E442"
+blue <- "#0072B2"
+
+source('./R/remove.harvest.outliers.fn.R')
+source('./R/spatial.model.selection.R')
+source('./R/select.best.variogram.R')
+source('./R/spatial.selection.plots.R')
+source('./R/read.yield.data.R')
+source('./R/combined.map.R')
+```
+
+
+## Load Data
+
+```{r,eval=TRUE,echo=FALSE}
+field = 'D'
+root = '../ManagementZoneML/data/'
+
+
+Years <- c(2013,2014,2015,2016,2017,2018,2019,2020)
+Crops <- c('Corn','Soybean','Corn','Soybean','Corn','Soybean','Corn','Soybean')
+harvests <-vector(mode='list',length=length(Years))
+for(i in 1:length(Years)) {
+  harvests[[i]] <- read.yield.data(root,field,Years[i],Crops[i])
+}
+```
+
+
+```{r,fig.width=8,fig.height=4.5,echo=FALSE}
+
+Maps6 <- combined.map(harvests)
+ggplot(Maps6, aes(Longitude,Latitude)) + 
+geom_point(aes(colour = Quantile),size=.5) + 
+scale_colour_gradient2(low=vermillion, mid=yellow, high=blue, midpoint = 0.5) +
+labs(colour = "Relative Yield Rank", x="Easting", y="Northing", title = "Multiple Years") + facet_wrap(~ Map)
+```
+
+
+# Model Selection
+
+I've had some memory issues.
+
+```{r}
+methods=c('ns',
+          'bs',
+          'gam',
+         'te',
+          'tp')
+          #'lm')
+# re c(2,9),
+
+ranges = matrix(c(c(3,35),
+                  c(3,35),
+                  c(4,400),
+                 c(3,36),
+                  c(3,36)
+                  #c(3,24)
+                 ),ncol=2,byrow=TRUE)
+ranges
+models=8
+#methods <- methods
+
+Methods = vector(mode='list',length=length(methods))
+```
+
+
+```{r,echo=FALSE,fig.width=6,fig.height=3}
+for(j in 1:length(methods)) {
+  Models <- vector(mode='list',length=length(Years))
+  Plots <- vector(mode='list',length=length(Years))
+
+  for(i in 1:length(Years)) {
+    Models[[i]] <- spatial.model.selection(harvests[[i]],
+                                           range=ranges[j,],
+                                           method=methods[j],
+                                           models=models)
+    Plots[[i]] <- spatial.selection.plots(Models[[i]])
+    #print(summary(lm(Gamma ~ 0 + K + K:Distance,data=Models[[i]]$ResidualsData)))
+    print(Plots[[i]])
+  }
+  
+  Selection <- NULL
+  BestBIC <- NULL
+  BestSlope <- NULL
+
+  for(i in 1:length(Years)) {
+    tmp <- Models[[i]]$Selection
+    tmp$Year <- Years[i]
+    Selection <- rbind(Selection,tmp)
+  
+    tmp <- select.best.variogram(Models[[i]])
+    tmp$Year <- Years[i]
+    BestBIC <- rbind(BestBIC,tmp)
+
+    tmp <- select.best.variogram(Models[[i]],criteria='slope')
+    tmp$Year <- Years[i]
+    BestSlope <- rbind(BestSlope,tmp)
+  }
+
+  Methods[[j]] <- list(Models=Models,
+                       Plots=Plots,
+                       Selection=Selection,
+                       BestBIC=BestBIC,
+                       BestSlope=BestSlope)
+}
+
+```
+
+\pagebreak
+
+# Model Selection Comparisons
+
+```{r}
+SummaryBIC <- NULL
+SummarySlope <- NULL
+```
+
+```{r,echo=FALSE,fig.width=6,fig.height=3}
+for(i in 1:length(methods)) {
+  BestBIC <- Methods[[i]]$BestBIC
+  BestBIC$Year <- factor(BestBIC$Year)
+  bicplot <- ggplot(BestBIC, aes(Distance,Gamma)) + 
+    geom_point(aes(colour = Year),size=2) + 
+    geom_smooth(aes(group = Year,color=Year), se=FALSE) +
+    scale_colour_manual(values=c(cbPalette)) + facet_wrap(~Source) +
+    labs(title = paste(methods[i],"Selected by BIC"))
+  
+  print(bicplot) 
+  
+  BestSlope <- Methods[[i]]$BestSlope
+  BestSlope$Year <- factor(BestSlope$Year)
+  slopeplot <- ggplot(BestSlope, aes(Distance,Gamma)) + 
+    geom_point(aes(colour = Year),size=2) + 
+    geom_smooth(aes(group = Year,color=Year), se=FALSE) +
+    scale_colour_manual(values=c(cbPalette)) + facet_wrap(~Source) +
+    labs(title = paste(methods[i],"Selected by Slope"))
+
+  print(slopeplot)
+  
+  BestBIC$Method <- methods[i]
+  BestSlope$Method <- methods[i]
+  SummaryBIC <- rbind(SummaryBIC,BestBIC)
+  SummarySlope <- rbind(SummarySlope,BestSlope)
+}
+```
+
+# Model Selection Averages
+
+## Average Residuals SemiCorrelations
+```{r}
+ResidualsTable <- aggregate(Gamma ~ Method,data=SummaryBIC[SummaryBIC$Source=='Residuals',], mean)
+names(ResidualsTable)[2] <- 'BIC'
+ResidualsTable$Slope <- aggregate(Gamma ~ Method, data=SummarySlope[SummarySlope$Source=='Residuals',], mean)[,2]
+ResidualsTable
+```
+
+## Average Model SemiCorrelations
+
+```{r}
+ModelTable <- aggregate(Gamma ~ Method,data=SummaryBIC[SummaryBIC$Source=='Model',], mean)
+names(ModelTable)[2] <- 'BIC'
+ModelTable$Slope <- aggregate(Gamma ~ Method, data=SummarySlope[SummarySlope$Source=='Model',], mean)[,2]
+ModelTable
+```
+
+
+# Distance Plots
+
+```{r,echo=FALSE}
+combined.distance <- function(maps) {
+  
+  Distance <- maps[[1]]$DISTANCE
+  Sample <- 1:length(Distance)
+  Year=rep(attr(maps[[1]],'Year'),length(Distance))
+  
+  for(i in 2:length(maps)) {
+    Distance <- c(Distance,maps[[i]]$DISTANCE)
+    Sample <- c(Sample,1:length(maps[[i]]$DISTANCE))
+    Year=c(Year,rep(attr(maps[[i]],'Year'),length(maps[[i]]$DISTANCE)))
+  }
+  
+  return(data.frame(Distance=Distance,
+                    Sample=Sample,
+                    Year=Year))
+}
+Distance.dat <- combined.distance(harvests)
+```
+
+```{r,echo=FALSE,fig.width=6,fig.height=3}
+Distance.dat$Year <- as.factor(Distance.dat$Year)
+ggplot(Distance.dat, aes(Sample,Distance)) + 
+geom_point(aes(colour = Year),size=.2) + 
+ scale_colour_manual(values=c(cbPalette))
+aggregate(Distance ~ Year,Distance.dat,FUN=sd)
+```
+
+```{r}
+save(Methods,file='ModelsD.Rda')
+```

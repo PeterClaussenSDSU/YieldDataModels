@@ -1,0 +1,287 @@
+---
+title: "Functional Data Analysis and Experimental Design for On-farm Strip Trials"
+author: "Peter Claussen"
+date: "10/13/2021"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+<!-- See ASA_CSSA_SSSA/2018/ThoughtsAboutPower -->
+
+```{r,echo=FALSE}
+library(splines)
+library(ggplot2)
+library(gridExtra)
+library(mgcv)
+
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#F0E442","#CC79A7","#000000","#734f80", "#2b5a74", "#004f39", "#787221", "#003959", "#6aaf00", "#663cd3")
+grey <- cbPalette[1] #"#999999"
+orange <- cbPalette[2] #"#E69F00"
+skyblue <- cbPalette[3] #"#56B4E9"
+bluishgreen <- cbPalette[4] #"#009E73"
+yellow <- cbPalette[7] #"#F0E442"
+blue <- cbPalette[5] #"#0072B2"
+vermillion <- cbPalette[6] #"#D55E00"
+pair.colors <- c(2,5)
+```
+# Introduction
+
+
+
+## Functional Forms for Functional Data
+Consider each strip as an independent experimental unit, denoted $Y$. Where it is necessary to discuss multiple strips in the same context, we will use $Y_1, \dots, Y_k$ to denote $k$ strips. Further, we will denote a specific observation from $Y$ at the distance $d$ as $Y(d)$, thus denoting the specific observation as a function of distance.
+
+In general, $Y(d)$ will take a functional form, with as associated measurement error
+
+$$
+Y(d) = \mathbf{A}{\mathbf{\theta}} + f(d) + e_i
+$$
+
+Generically, we can write $f(d)$ as
+
+$$
+f(d) = \sum _{j=1} ^k b_j(d) \beta_j
+$$
+
+where $b_j$ is the $j$ basis function over $d$.
+
+
+
+## Polynomial Functions
+Polynomial functions are frequently used as functional forms due to their simplicity and flexibility. Unlike power or exponential functions, polynomial functions can be fit to data using ordinary least squares (polynomial regression), while any number of data points can be fit exactly using polynomials of sufficiently high order.
+Polynomial functions take the form
+
+
+$$
+y_i = \beta_0 + \beta_1 x_i + \dots + \beta_{k} x_i^k +e
+$$
+Then we can represent this generically by $b_1(x) = x$ and $b_k(x) = x^k$
+
+
+
+The order of the polynomial is given by the magnitude of the largest exponent $n$, and $N+1$ data points can be fit perfectly (e=0) with a polynomial of order $k$. Thus, any midpoint value between two arbitrary points $x_i$ and $x_j$ can be interpolated exactly with a polynomial of order 1. i.e $y = a +bx_i$. One possible functional form for $y_{ij}$, then, computes $y(d)$ for any $d$ by identifying the $y_{ikK}$ bounding $d$ and finding the straight line interpolation between the points. 
+
+Pair-wise linear interpolation has the advantage of computational simplicity but does not minimize variance for the approximating function over the range of data
+
+# Basis functions
+Now, suppose instead of modeling $y$ as a linear response of $x$, we instead model $y$ as a response of a function of $x$, that is,
+
+$$
+y_i = \beta_0 + \beta_1 b_1(x_i) + \dots + \beta_{k} b_k(x_i) + e
+$$
+and we denote $b_1(\circ), b_2(\circ), \dots, b_k(\circ)$ as basis functions.
+
+
+One way to define the functions forms of $b$ is piece-wise regression. We limit sets of functions to a limited range of $x$, i.e. for a model with two piece-wise cubic polynomials we write
+
+$$
+ y_i =   
+  \begin{cases}
+    \beta_{00} + \beta_{01} x_i + \beta_{02} x_i^2 + \beta_{03} x_i^3 & x_i < c \\
+    \beta_{10} + \beta_{11} x_i + \beta_{12} x_i^2 + \beta_{13} x_i^3 & x_i \geq c 
+  \end{cases}
+$$
+
+where $c$ forms a *knot* If there are $k$ knots, we require $k=1$ knots. Further, since each polynomial has 4 coefficients, we require $4*(k+1)$ or 8 coefficients or degrees of freedom to fit the data. However, there is one issue with this formulation - we have no guarantee that functions are smooth at the knots.
+
+We add three additional constrainsts to the piecewise regression model to produce a spline model - that the fitted curve is continuous at the knots, but also that the first and second derivatives are also continuous. These additional constraints consume a degree of freedom each (we have less flexibility in fitting the model), so our example for two cubic polynomials implemented as splines has 5 d.f. With $k$ knots, we can write our model in the form
+
+$$
+y_i = \beta_0 + \beta_1 b_1(x_i) + \dots + \beta_{k+2} b_{k+2}(x_i) + \beta_{k+3} b_{k+3}(x_i) + e
+$$
+
+##Types of splines 
+### Regression splines 
+### natural splines 
+### b-splines
+### smoothing splines
+
+# Choice of Knots
+
+How many knots should we choose to fit data, and where should the knots be located?
+
+
+Piece-wise interpolation.
+Splines
+
+# Generalized Additive Models
+
+A generalized additive model following from our previous examples may take the form (adapted from )
+
+$$
+g(y_i) = \mathbf{A_i} \mathbf{\theta} + f(x_{1i}) +f(x_{2i},x_{3i}) + e_i
+$$
+where $\mathbf{A_i} \mathbf{\theta}$ are the strictly parametric components of the model and  $f(\circ)$ is a function form of the covariate $x_1, \dots $. In the functional analysis of strip trials, $\mathbf{A_i} \mathbf{\theta}$ would represent the treatment structure while $f(x_{1i})$ represents a smooth function of yield over distance.
+
+In this case, we can assume $g(y_i)=y_i$ and $\mathbf{A_i} \mathbf{\theta} = \mu_i$, so this simplifies to a linear model with respect to the smoothing function. We will use distance from the west end of the field as covariate $\delta = x_1$
+
+$$
+y_i = f(\delta) + e_i
+$$
+
+## Forms of $f(\delta)$
+
+We'll use a single pass from the East Quarter (see FunctionalAnalysisStripTrials)
+# Materials and Methods
+
+## Example 1
+
+```{r,echo=FALSE}
+load(file="~/Work/git/ASA_CSSA_SSSA/2017/Workshop/Case Study 2/Strips.Rda")
+```
+
+```{r,echo=FALSE}
+EastQuarter.dat$Pass <- floor(EastQuarter.dat$Northing/6)+1
+EastQuarter.dat$Pair <- floor((EastQuarter.dat$Pass+1)/2)
+EastQuarter.dat$Direction <- "Easterly"
+EastQuarter.dat$Direction[EastQuarter.dat$Heading>100] <- "Westerly"
+EastQuarter.dat$Direction <- as.factor(EastQuarter.dat$Direction)
+
+#EastQuarter.dat$Pass[EastQuarter.dat$Heading>100] <- EastQuarter.dat$Pass[EastQuarter.dat$Heading>100] + 400
+EastQuarter.dat$PassNo <- EastQuarter.dat$Pass
+
+EastQuarter.dat$Block <- ceiling(EastQuarter.dat$Pair/2)
+EastQuarter.dat$Strip <- EastQuarter.dat$Pair %/% EastQuarter.dat$Block
+EastQuarter.dat$Block <- as.factor(EastQuarter.dat$Block)
+EastQuarter.dat$Pass <- as.factor(EastQuarter.dat$Pass)
+EastQuarter.dat$Pair <- as.factor(EastQuarter.dat$Pair)
+EastQuarter.dat$Strip <- as.factor(EastQuarter.dat$Strip)
+```
+
+
+```{r,echo=FALSE}
+passes <- unique(EastQuarter.dat$Pass)
+SinglePass.dat <- EastQuarter.dat[EastQuarter.dat$Pass==passes[1],]
+```
+
+# Polynomial Regression
+
+```{r}
+SinglePass1.lm <- lm(Yield ~ poly(Easting,1), data=SinglePass.dat)
+SinglePass.dat$Predicted1 <- predict(SinglePass1.lm)
+
+SinglePass2.lm <- lm(Yield ~ poly(Easting,6), data=SinglePass.dat)
+SinglePass.dat$Predicted2 <- predict(SinglePass2.lm)
+
+SinglePass3.lm <- lm(Yield ~ poly(Easting,11), data=SinglePass.dat)
+SinglePass.dat$Predicted3 <- predict(SinglePass3.lm)
+
+SinglePass4.lm <- lm(Yield ~ poly(Easting,16), data=SinglePass.dat)
+SinglePass.dat$Predicted4 <- predict(SinglePass4.lm)
+
+SinglePass5.lm <- lm(Yield ~ poly(Easting,21), data=SinglePass.dat)
+SinglePass.dat$Predicted5 <- predict(SinglePass5.lm)
+
+SinglePass6.lm <- lm(Yield ~ poly(Easting,26), data=SinglePass.dat)
+SinglePass.dat$Predicted6 <- predict(SinglePass6.lm)
+```
+
+```{r}
+ggplot(SinglePass.dat, aes(Easting,Yield)) + 
+geom_point(size=.2,color=cbPalette[1]) + 
+  geom_line(aes(Easting,Predicted1),size=1,color=cbPalette[2]) + 
+  geom_line(aes(Easting,Predicted2),size=1,color=cbPalette[3]) + 
+  geom_line(aes(Easting,Predicted3),size=1,color=cbPalette[4]) + 
+  geom_line(aes(Easting,Predicted4),size=1,color=cbPalette[5]) + 
+  geom_line(aes(Easting,Predicted5),size=1,color=cbPalette[6]) + 
+  geom_line(aes(Easting,Predicted6),size=1,color=cbPalette[7]) + 
+scale_colour_manual(values=cbPalette[pair.colors]) + 
+labs(colour = "Variety", x="Easting", y="Yield", title = "Single Swath, Polynomial Smoothing")
+```
+
+```{r}
+par(mfrow=c(2,3))
+qqnorm(resid(SinglePass1.lm))
+qqnorm(resid(SinglePass2.lm))
+qqnorm(resid(SinglePass3.lm))
+qqnorm(resid(SinglePass4.lm))
+qqnorm(resid(SinglePass5.lm))
+qqnorm(resid(SinglePass6.lm))
+```
+
+```{r,eval=FALSE}
+summary(SinglePass1.lm)
+summary(SinglePass2.lm)
+summary(SinglePass3.lm)
+summary(SinglePass4.lm)
+summary(SinglePass5.lm)
+summary(SinglePass6.lm)
+```
+
+```{r}
+plot(c(AIC(SinglePass1.lm),AIC(SinglePass2.lm),AIC(SinglePass3.lm),AIC(SinglePass4.lm),AIC(SinglePass5.lm),AIC(SinglePass6.lm)))
+```
+
+
+
+# ns Regression
+
+```{r}
+library(splines)
+SinglePass1.ns <- lm(Yield ~ ns(Easting,1), data=SinglePass.dat)
+SinglePass.dat$Predicted1 <- predict(SinglePass1.ns)
+
+SinglePass2.ns <- lm(Yield ~ ns(Easting,6), data=SinglePass.dat)
+SinglePass.dat$Predicted2 <- predict(SinglePass2.ns)
+
+SinglePass3.ns <- lm(Yield ~ ns(Easting,11), data=SinglePass.dat)
+SinglePass.dat$Predicted3 <- predict(SinglePass3.ns)
+
+SinglePass4.ns <- lm(Yield ~ ns(Easting,16), data=SinglePass.dat)
+SinglePass.dat$Predicted4 <- predict(SinglePass4.ns)
+
+SinglePass5.ns <- lm(Yield ~ ns(Easting,21), data=SinglePass.dat)
+SinglePass.dat$Predicted5 <- predict(SinglePass5.ns)
+
+SinglePass6.ns <- lm(Yield ~ ns(Easting,26), data=SinglePass.dat)
+SinglePass.dat$Predicted6 <- predict(SinglePass6.ns)
+```
+
+```{r}
+ggplot(SinglePass.dat, aes(Easting,Yield)) + 
+geom_point(size=.2,color=cbPalette[1]) + 
+  geom_line(aes(Easting,Predicted1),size=1,color=cbPalette[2]) + 
+  geom_line(aes(Easting,Predicted2),size=1,color=cbPalette[3]) + 
+  geom_line(aes(Easting,Predicted3),size=1,color=cbPalette[4]) + 
+  geom_line(aes(Easting,Predicted4),size=1,color=cbPalette[5]) + 
+  geom_line(aes(Easting,Predicted5),size=1,color=cbPalette[6]) + 
+  geom_line(aes(Easting,Predicted6),size=1,color=cbPalette[7]) + 
+scale_colour_manual(values=cbPalette[pair.colors]) + 
+labs(colour = "Variety", x="Easting", y="Yield", title = "Single Swath, ns spline Smoothing")
+```
+
+```{r}
+par(mfrow=c(2,3))
+qqnorm(resid(SinglePass1.ns))
+qqnorm(resid(SinglePass2.ns))
+qqnorm(resid(SinglePass3.ns))
+qqnorm(resid(SinglePass4.ns))
+qqnorm(resid(SinglePass5.ns))
+qqnorm(resid(SinglePass6.ns))
+```
+
+Functional Data Objects
+
+```{r}
+library(fda)
+
+times_basis = seq(min(SinglePass.dat$Easting),max(SinglePass.dat$Easting),length.out=200)
+knots    = seq(min(SinglePass.dat$Easting),max(SinglePass.dat$Easting),length.out=6) #Location of knots
+n_knots   = length(knots) #Number of knots
+n_order   = 4 # order of basis functions: cubic bspline: order = 3 + 1
+n_basis   = length(knots) + n_order - 2;
+basis = create.bspline.basis(c(min(times_basis),max(times_basis)),n_basis,n_order,knots)
+n_basis
+
+single.smooth <- smooth.basis(argvals = SinglePass.dat$Easting, y = SinglePass.dat$Yield, fdParobj = basis)
+plot(single.smooth)
+```
+
+
+
+
+<!-- Required replicates	 -->
+<!-- Detectable differences	 -->
+      
+

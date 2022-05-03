@@ -1,0 +1,766 @@
+---
+title: "Spatial Analysis of a Strip Trial"
+author: "Peter Claussen"
+date: "11/10/2020"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+models=12
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(mgcv)
+grey <- "#999999"
+orange <- "#E69F00"
+skyblue <- "#56B4E9"
+bluishgreen <- "#009E73"
+yellow <- "#F0E442"
+blue <- "#0072B2"
+vermillion <- "#D55E00"
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#F0E442","#CC79A7","#000000","#734f80", "#2b5a74", "#004f39", "#787221", "#003959", "#6aaf00", "#663cd3")
+```
+
+```{r}
+source('./R/remove.harvest.outliers.fn.R')
+source('./R/spatial.model.selection.R')
+source('./R/select.best.variogram.R')
+source('./R/spatial.selection.plots.R')
+source('./R/read.yield.data.R')
+source('./R/combined.map.R')
+```
+
+
+# Introduction
+
+With the advent of crop harvesters equipped with yield monitors and GPS enabled sensors, there has been a rapid increase in on-farm product trials. These trial are usually conducted in strips; farmers are asked to apply a test product to a small portion of their fields in a number of strips, leaving the remainder of the field untreated. The treated strips can then be compared to the untreated portions of the field to evaluate the effectiveness of the product under real-world conditions, and to engage farmers in product testing.
+
+However, less attention has been payed to the development of methods to analysis the results of on-farm strip trials. In some cases, the strips are analyzed as if they were single plots in a small-plot trial, such as a standard randomized complete block design. Such analysis is undesirable for several reasons, two of the chief reasons being a lack of randomization of the treatments to strips and the lack of exchangibility among the strips.
+
+Other analysis have been proposed. Here, we develop a geospatial based model to assess the effect of treatment on strips of product.
+
+## The Spatial Model
+
+We consider a spatial model for a strip trial of the form
+
+$$
+Z(\mathbf{s_i}) = \theta(\mathbf{s_i}) + Y(\mathbf{s_i}) + e(\mathbf{s_i})
+$$
+
+The spatial model consists of three components. The first is the fixed effect component and includes the experimental treatments applied to point $\mathbf{s_i}$. The inherent response or fertility, in the absence of treatment, is represented as a random spatial field $Y$  that can be index by points $\mathbf{s_i}$. Finally, there is a white-noise error process $e$ associated with measurement of the realized random field, also indexed by \mathbf{s_i}.
+
+## Selection of a smoothing parameter
+
+###  Information Criteria
+
+Information criteria, such as AIC or BIC, are commonly used to select the 'best' number of parameters in a statistical model. These are calculated as subtracting, or penalizing, some value based on the number of parameters from the log-likelihood. The formula for AIC can be simplified to
+
+$$
+AIC = 2k - 2 \ln(\widehat{L})
+$$
+where $\widehat{L}$ is the maximum value of the likelihood function for model, ($L=P(X|\theta,M)$, with $X$ being the data and $M$ the model with parameters $\theta$) and $k$ is the number of parameters in the model. Similarly, BIC is given by
+
+$$
+BIC = k \ln(n) - 2 \ln(\widehat{L})
+$$
+with $k$ and $\widehat{L}$ as before and $n$ is the number of observations in $X$. These criteria are well defined for methods that depend on maximum likelihood estimation, but are less well suited when other optimization methods are employed, such as the penalized maximum likelihood used in GAM (generalized additive models). In this paper, we consider alternative methods for selection an optimal number of parameters for smoothing a spatial random field, specifically the semivariogram.
+
+
+### The Semivariogram
+ 
+Consider a simple random field, absent any fixed effects.
+$$
+Z(\mathbf{s_i}) = Y(\mathbf{s_i}) + e(\mathbf{s_i})
+$$
+
+One of the properties of a random field is the correlation structure among the various points $\mathbf{s_i}$. Specifically, the covariance function of two points $s_i$ and $s_i +h$ seperated by a distance $h$ is a function strictly of the distance $h$, when the spatial field is isotropic and stationary. We write this as
+
+$$
+\gamma(h)
+$$
+
+# Materials and Methods
+
+## Example 1
+
+## Example 2
+```{r,echo=FALSE}
+treated.2019.dat <- read.csv(file='../ManagementZoneML/data/B 2019 Soybeans Treated.csv')
+left = 1000
+treated.2019.dat <- treated.2019.dat[treated.2019.dat$Longitude >left,]
+treated.2019.dat$Pass <- treated.2019.dat$Block
+treated.2019.dat$Block <- as.factor(ceiling(treated.2019.dat$Pass/2))
+treated.2019.dat$Sprayed <- treated.2019.dat$Pass %in% c(2,4,6,8)
+```
+
+```{r,echo=FALSE}
+treated.2019.dat$SprayedRank <- rank(treated.2019.dat$Sprayed)
+treated.2019.dat$SprayedRank <- treated.2019.dat$SprayedRank/max(treated.2019.dat$SprayedRank)
+
+treated.2019.dat$YieldRank <- rank(treated.2019.dat$Yield)
+treated.2019.dat$YieldRank <- treated.2019.dat$YieldRank/max(treated.2019.dat$YieldRank)
+
+MapsSprayed <- data.frame(Longitude=c(treated.2019.dat$Longitude,
+                                treated.2019.dat$Longitude),
+                   Latitude=c(treated.2019.dat$Latitude,
+                              treated.2019.dat$Latitude),
+                   Value=c(treated.2019.dat$SprayedRank,
+                           treated.2019.dat$YieldRank),
+                   Map=c(rep('Spray',length(treated.2019.dat$SprayedRank)),
+                         rep('Yield',length(treated.2019.dat$YieldRank))))
+```
+
+```{r,echo=FALSE, fig.width=6, fig.height=4}
+ggplot(MapsSprayed, aes(Longitude,Latitude)) + 
+geom_point(aes(colour = Value),size=1) + 
+scale_colour_gradient2(low=vermillion, mid=yellow, high=blue, midpoint = 0.5) +
+labs(colour = "Relative Rank", x="Easting", y="Northing", title = "Fungicide Strip Trial (Raw data by rank)") + facet_wrap(~ Map)
+```
+
+### Cleaning the data
+
+The data were screen to remove outliers, specifically, yield values of 0, or greater than 80 bu/acre, were excluded from the data.
+```{r}
+ggplot(treated.2019.dat, aes(x=Yield)) + geom_histogram()
+ggplot(treated.2019.dat, aes(sample = Yield)) + stat_qq() + stat_qq_line()
+treated.2019.dat <- treated.2019.dat[treated.2019.dat$Yield<80,]
+treated.2019.dat <- treated.2019.dat[treated.2019.dat$Yield>0,]
+ggplot(treated.2019.dat, aes(x=Yield)) + geom_histogram()
+ggplot(treated.2019.dat, aes(sample = Yield)) + stat_qq() + stat_qq_line()
+```
+
+
+```{r}
+treated.2019.dat$SprayedRank <- rank(treated.2019.dat$Sprayed)
+treated.2019.dat$SprayedRank <- treated.2019.dat$SprayedRank/max(treated.2019.dat$SprayedRank)
+
+treated.2019.dat$YieldRank <- rank(treated.2019.dat$Yield)
+treated.2019.dat$YieldRank <- treated.2019.dat$YieldRank/max(treated.2019.dat$YieldRank)
+
+MapsSprayed <- data.frame(Longitude=c(treated.2019.dat$Longitude,
+                                treated.2019.dat$Longitude),
+                   Latitude=c(treated.2019.dat$Latitude,
+                              treated.2019.dat$Latitude),
+                   Value=c(treated.2019.dat$SprayedRank,
+                           treated.2019.dat$YieldRank),
+                   Map=c(rep('Spray',length(treated.2019.dat$SprayedRank)),
+                         rep('Yield',length(treated.2019.dat$YieldRank))))
+```
+
+```{r,echo=FALSE, fig.width=6, fig.height=4}
+ggplot(MapsSprayed, aes(Longitude,Latitude)) + 
+geom_point(aes(colour = Value),size=1) + 
+scale_colour_gradient2(low=vermillion, mid=yellow, high=blue, midpoint = 0.5) +
+labs(colour = "Relative Rank", x="Easting", y="Northing", title = "Fungicide Strip Trial") + facet_wrap(~ Map)
+```
+
+# Deterministic models
+
+Adding code from ModelSelectionG
+
+```{r,echo=FALSE}
+harvests <-vector(mode='list',length=1)
+harvests[[1]] <- treated.2019.dat
+methods=c('ns',
+          'bs',
+          'gam',
+          'te',
+          'tp')
+          #'lm')
+# methods <- methods[1:2]
+# re c(2,9),
+
+ranges = matrix(c(c(3,35),
+                  c(3,35),
+                  c(40,320),
+                  c(3,32),
+                  c(3,32)),
+                 # c(2,24)),
+                ncol=2,byrow=TRUE)
+models=12
+
+Methods = vector(mode='list',length=length(methods))
+Years <- 2019
+```
+
+```{r,eval=FALSE}
+
+if(file.exists('Spatial.Methods.Rda')) {
+  load(file='Spatial.Methods.Rda')
+} else {
+
+
+for(j in 1:length(methods)) {
+
+  Models <- vector(mode='list',length=length(Years))
+  Plots <- vector(mode='list',length=length(Years))
+
+  for(i in 1:length(Years)) {
+    Models[[i]] <- spatial.model.selection(harvests[[i]],
+                                           range=ranges[j,],
+                                           method=methods[j],
+                                           models=models)
+    Plots[[i]] <- spatial.selection.plots(Models[[i]])
+    #print(summary(lm(Gamma ~ 0 + K + K:Distance,data=Models[[i]]$ResidualsData)))
+
+  }
+  
+  SelectionG <- NULL
+  BestBICG <- NULL
+  BestSlopeG <- NULL
+  BestNuggetG <- NULL
+
+  for(i in 1:length(Years)) {
+    tmp <- Models[[i]]$Selection
+    tmp$Year <- Years[i]
+    SelectionG <- rbind(SelectionG,tmp)
+  
+    tmp <- select.best.variogram(Models[[i]])
+    tmp$Year <- Years[i]
+    BestBICG <- rbind(BestBICG,tmp)
+
+    tmp <- select.best.variogram(Models[[i]],criteria='slope')
+    tmp$Year <- Years[i]
+    BestSlopeG <- rbind(BestSlopeG,tmp)
+    
+    tmp <- select.best.variogram(Models[[i]],criteria='nugget')
+    tmp$Year <- Years[i]
+    BestNuggetG <- rbind(BestNuggetG,tmp)
+  }
+#  Rprof(NULL)
+  
+  Methods[[j]] <- list(Models=Models,
+                       Plots=Plots,
+                       Selection=SelectionG,
+                       BestBIC=BestBICG,
+                       BestSlope=BestSlopeG,
+                       BestNugget=BestNuggetG)
+}
+  save(Methods,file='Spatial.Methods.Rda')
+}
+
+for(j in 1:length(methods)) {
+  for(i in 1:length(Years)) {
+    current <- Methods[[j]]
+    print(current$Plots[[i]])
+    print(reshape(current$Models[[i]]$Selection,direction = "wide",idvar = "K",timevar = "Criteria"))
+  }
+}
+```
+
+
+# Including Parametric Effects
+
+```{r}
+if(file.exists('ModelsFixed.Rda')) {
+  load(file='ModelsFixed.Rda')
+} else {
+  Methods <- vector(mode='list',length=length(methods))
+  for(j in 1:length(methods)) {
+    
+    ModelsFixed <- vector(mode='list',length=length(Years))
+    PlotsFixed <- vector(mode='list',length=length(Years))
+    
+    for(i in 1:length(Years)) {
+      ModelsFixed[[i]] <- spatial.model.selection(harvests[[i]],
+                                                  fixed='Sprayed',
+                                                  range=ranges[j,],
+                                                  method=methods[j],
+                                                  models=models)
+      PlotsFixed[[i]] <- spatial.selection.plots(ModelsFixed[[i]])
+      print(PlotsFixed[[i]])
+      #print(summary(lm(Gamma ~ 0 + K + K:Distance,data=Models[[i]]$ResidualsData)))
+    }
+    
+    
+    
+    SelectionG <- NULL
+    BestBICG <- NULL
+    BestSlopeG <- NULL
+    BestNuggetG <- NULL
+    
+    for(i in 1:length(Years)) {
+      tmp <- ModelsFixed[[i]]$Selection
+      tmp$Year <- Years[i]
+      SelectionG <- rbind(SelectionG,tmp)
+      
+      tmp <- select.best.variogram(ModelsFixed[[i]])
+      tmp$Year <- Years[i]
+      BestBICG <- rbind(BestBICG,tmp)
+      
+      tmp <- select.best.variogram(ModelsFixed[[i]],criteria='slope')
+      tmp$Year <- Years[i]
+      BestSlopeG <- rbind(BestSlopeG,tmp)
+      
+      tmp <- select.best.variogram(ModelsFixed[[i]],criteria='nugget')
+      tmp$Year <- Years[i]
+      BestNuggetG <- rbind(BestNuggetG,tmp)
+    }
+    #  Rprof(NULL)
+    
+    Methods[[j]] <- list(Models=ModelsFixed,
+                         Plots=PlotsFixed,
+                         Selection=SelectionG,
+                         BestBIC=BestBICG,
+                         BestSlope=BestSlopeG,
+                         BestNugget=BestNuggetG)
+    
+    save(ModelsFixed,PlotsFixed,Methods,file='ModelsFixed.Rda')
+  }
+}
+```
+
+```{r}
+for(j in 1:length(methods)) {
+  for(i in 1:length(Years)) {
+    current <- Methods[[j]]
+    print(methods[j])
+    print(current$Plots[[i]])
+    print(reshape(current$Models[[i]]$Selection,direction = "wide",idvar = "K",timevar = "Criteria"))
+  }
+}
+```
+
+```{r,echo=FALSE,fig.width=6,fig.height=6}
+SummaryBIC <- NULL
+SummarySlope <- NULL
+SummaryNugget <- NULL
+
+pooled <- NULL
+for(i in 1:length(methods)) {
+  BestBIC <- Methods[[i]]$BestBIC
+  BestBIC$Year <- factor(BestBIC$Year)
+  BestBIC$Criteria <- 'BIC'
+  
+  BestSlope <- Methods[[i]]$BestSlope
+  BestSlope$Year <- factor(BestSlope$Year)
+  BestSlope$Criteria <- 'Slope'
+  
+  BestNugget <- Methods[[i]]$BestNugget
+  BestNugget$Year <- factor(BestNugget$Year)
+  BestNugget$Criteria <- 'Nugget'
+
+  current <- rbind(BestNugget,BestSlope,BestBIC)
+
+  current$Method <- methods[i]
+  pooled <- rbind(pooled, current)
+  BestBIC$Method <- methods[i]
+  BestSlope$Method <- methods[i]
+  BestNugget$Method <- methods[i]
+  
+  SummaryBIC <- rbind(SummaryBIC,BestBIC)
+  SummarySlope <- rbind(SummarySlope,BestSlope)
+  SummaryNugget <- rbind(SummaryNugget,BestNugget)
+}
+```
+
+```{r,echo=FALSE,fig.width=8,fig.height=4}
+ggplot(pooled[pooled$Source=='Model',], aes(Distance,Gamma)) + 
+    geom_point(aes(colour = Method),size=2) + 
+    geom_smooth(aes(group = Method,color=Year), se=FALSE) +
+    scale_colour_manual(values=c(cbPalette)) + facet_wrap(~Criteria) +
+    labs(title = "Semivariogram Selection, Model Variograms")
+```
+
+
+```{r,echo=FALSE,fig.width=8,fig.height=4}
+ggplot(pooled[pooled$Source=='Residuals',], aes(Distance,Gamma)) + 
+    geom_point(aes(colour = Method),size=2) + 
+    geom_smooth(aes(group = Method,color=Year), se=FALSE) +
+    scale_colour_manual(values=c(cbPalette)) + facet_wrap(~Criteria) +
+    labs(title = "Nugget Selection, Model Variograms")
+```
+
+```{r}
+pooled[pooled$Distance<20 & pooled$Source == "Model",]
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+## Natural splines
+```{r}
+library(splines)
+
+models.ns.lm <- vector(mode='list',length=3)
+ns.dat <- NULL
+
+tmp.dat <- treated.2019.dat[,c('Longitude','Latitude','Yield','Sprayed')]
+df=9
+null.ns.9.lm <- lm(Yield ~ ns(Longitude,df=df)*ns(Latitude,df=df), data=tmp.dat)
+models.ns.lm[[1]] <- lm(Yield ~ Sprayed + ns(Longitude,df=df)*ns(Latitude,df=df), data=tmp.dat)
+tmp.dat$Yield <- predict(models.ns.lm[[1]])
+tmp.dat$DF = df
+ns.dat <- rbind(ns.dat, tmp.dat)
+
+tmp.dat <- treated.2019.dat[,c('Longitude','Latitude','Yield','Sprayed')]
+df=9
+models.ns.lm[[2]] <- lm(Yield ~ Sprayed + ns(Longitude,df=df)*ns(Latitude,df=df), data=tmp.dat)
+tmp.dat$Yield <- predict(models.ns.lm[[2]])
+tmp.dat$DF = df
+ns.dat <- rbind(ns.dat, tmp.dat)
+
+tmp.dat <- treated.2019.dat[,c('Longitude','Latitude','Yield','Sprayed')]
+df=26
+null.ns.26.lm <- lm(Yield ~ ns(Longitude,df=df)*ns(Latitude,df=df), data=tmp.dat)
+models.ns.lm[[3]] <- lm(Yield ~ Sprayed + ns(Longitude,df=df)*ns(Latitude,df=df), data=tmp.dat)
+tmp.dat$Yield <- predict(models.ns.lm[[3]])
+tmp.dat$DF = df
+ns.dat <- rbind(ns.dat, tmp.dat)
+```
+
+```{r}
+#summary(models.ns.lm[[1]])
+anova(models.ns.lm[[1]])
+anova(null.ns.9.lm,models.ns.lm[[1]])
+anova(null.ns.9.lm,models.ns.lm[[1]],test="LRT")
+#summary(models.ns.lm[[2]])
+anova(models.ns.lm[[2]])
+anova(null.ns.26.lm,models.ns.lm[[2]])
+anova(null.ns.26.lm,models.ns.lm[[2]],test="LRT")
+```
+
+```{r}
+coef(models.ns.lm[[1]])[1:2]
+coef(models.ns.lm[[2]])[1:2]
+coef(models.ns.lm[[3]])[1:2]
+```
+
+
+```{r,fig.width=9,fig.height=6}
+ggplot(ns.dat, aes(Longitude,Latitude)) + 
+geom_point(aes(colour = Yield),size=1) + 
+scale_colour_gradient2(low=vermillion, mid=yellow, high=blue,midpoint = mean(ns.dat$Yield)) +
+labs(colour = "Lm with natural spline", x="Easting", y="Northing") + facet_wrap(~ DF)
+```
+
+```{r,fig.width=6,fig.height=3}
+ggplot(ns.dat, aes(x=Yield)) + geom_histogram() + facet_wrap(~ DF)
+```
+
+## B-splines
+
+12 df may be too many for bs; we have NA at 12
+```{r}
+models.bs.lm <- vector(mode='list',length=3)
+bs.dat <- NULL
+
+tmp.dat <- treated.2019.dat[,c('Longitude','Latitude','Yield','Sprayed')]
+df=9
+models.bs.lm[[1]] <- lm(Yield ~ Sprayed + bs(Longitude,df=df)*bs(Latitude,df=df), data=tmp.dat)
+
+tmp.dat$Yield <- predict(models.bs.lm[[1]])
+tmp.dat$DF = df
+bs.dat <- rbind(bs.dat, tmp.dat)
+
+tmp.dat <- treated.2019.dat[,c('Longitude','Latitude','Yield','Sprayed')]
+df=12
+models.bs.lm[[2]] <- lm(Yield ~ Sprayed + bs(Longitude,df=df)*bs(Latitude,df=df), data=tmp.dat)
+tmp.dat$Yield <- predict(models.bs.lm[[2]])
+tmp.dat$DF = df
+bs.dat <- rbind(bs.dat, tmp.dat)
+
+tmp.dat <- treated.2019.dat[,c('Longitude','Latitude','Yield','Sprayed')]
+df=26
+models.bs.lm[[3]] <- lm(Yield ~ Sprayed + bs(Longitude,df=df)*bs(Latitude,df=df), data=tmp.dat)
+
+tmp.dat$Yield <- predict(models.bs.lm[[3]])
+tmp.dat$DF = df
+bs.dat <- rbind(bs.dat, tmp.dat)
+```
+
+Note the df
+
+```{r}
+coef(models.bs.lm[[1]])[1:2]
+coef(models.bs.lm[[2]])[1:2]
+coef(models.bs.lm[[3]])[1:2]
+#summary(models.bs.lm[[1]])
+anova(models.bs.lm[[1]])
+
+#summary(models.bs.lm[[2]])
+anova(models.bs.lm[[2]])
+anova(models.bs.lm[[3]])
+```
+
+
+```{r,fig.width=9,fig.height=6}
+ggplot(bs.dat, aes(Longitude,Latitude)) + 
+geom_point(aes(colour = Yield),size=1) + 
+scale_colour_gradient2(low=vermillion, mid=yellow, high=blue,midpoint = mean(bs.dat$Yield)) +
+#scale_colour_gradient(low=cbPalette[8], high=cbPalette[5]) +
+labs(colour = "Lm with b-spline", x="Easting", y="Northing") + facet_wrap(~ DF)
+```
+
+```{r,fig.width=6,fig.height=3}
+ggplot(bs.dat, aes(x=Yield)) + geom_histogram() + facet_wrap(~ DF)
+```
+
+## GAM
+
+```{r}
+
+models.gam <- vector(mode='list',3)
+gam.dat <- NULL
+
+tmp.dat <- treated.2019.dat[,c('Longitude','Latitude','Yield','Sprayed')]
+models.gam[[1]] <- gam(Yield ~ Sprayed + s(Longitude,Latitude,k=116),data=tmp.dat)
+tmp.dat$Yield <- predict(models.gam[[1]])
+tmp.dat$K = 116
+gam.dat <- rbind(gam.dat, tmp.dat)
+
+tmp.dat <- treated.2019.dat[,c('Longitude','Latitude','Yield','Sprayed')]
+models.gam[[2]] <- gam(Yield ~ Sprayed + s(Longitude,Latitude,k=65),data=tmp.dat)
+tmp.dat$Yield <- predict(models.gam[[2]])
+tmp.dat$K = 65
+gam.dat <- rbind(gam.dat, tmp.dat)
+
+tmp.dat <- treated.2019.dat[,c('Longitude','Latitude','Yield','Sprayed')]
+models.gam[[3]] <- gam(Yield ~ Sprayed + s(Longitude,Latitude,k=320),data=tmp.dat)
+tmp.dat$Yield <- predict(models.gam[[3]])
+tmp.dat$K = 320
+gam.dat <- rbind(gam.dat, tmp.dat)
+```
+
+```{r,fig.width=9,fig.height=6}
+ggplot(gam.dat, aes(Longitude,Latitude)) + 
+geom_point(aes(colour = Yield),size=1) + 
+scale_colour_gradient2(low=vermillion, mid=yellow, high=blue,midpoint = mean(gam.dat$Yield)) +
+#scale_colour_gradient(low=cbPalette[8], high=cbPalette[5]) +
+labs(colour = "GAM", x="Easting", y="Northing") + facet_wrap(~ K)
+```
+
+```{r,fig.width=6,fig.height=3}
+ggplot(gam.dat, aes(x=Yield)) + geom_histogram() + facet_wrap(~ K)
+```
+
+
+```{r}
+
+default.gam <- gam(Yield ~ Sprayed + s(Longitude,Latitude),data=treated.2019.dat)
+gam.check(default.gam)
+summary(default.gam)
+
+summary(models.gam[[1]])
+summary(models.gam[[2]])
+summary(models.gam[[3]])
+```
+
+```{r}
+null.gam <- gam(Yield ~ s(Longitude,Latitude,k=116),data=treated.2019.dat)
+gam.check(null.gam)
+
+anova(null.gam)
+anova(null.gam,models.gam[[1]])
+
+
+anova(models.gam[[1]])
+plot(models.gam[[1]])
+
+null.gam <- gam(Yield ~ s(Longitude,Latitude,k=320),data=treated.2019.dat)
+gam.check(null.gam)
+
+anova(null.gam)
+anova(null.gam,models.gam[[2]])
+
+
+anova(models.gam[[2]])
+plot(models.gam[[2]])
+```
+
+
+# TE
+
+```{r}
+#for some reason, this now gives a vector memory exhausted error
+models.te <- vector(mode='list',3)
+te.dat <- NULL
+
+tmp.dat <- treated.2019.dat[,c('Longitude','Latitude','Yield','Sprayed')]
+models.te[[1]] <- gam(Yield ~ Sprayed + te(Longitude,Latitude,k=11),data=tmp.dat)
+tmp.dat$Yield <- predict(models.te[[1]])
+tmp.dat$K = 11
+te.dat <- rbind(te.dat, tmp.dat)
+
+tmp.dat <- treated.2019.dat[,c('Longitude','Latitude','Yield','Sprayed')]
+models.te[[2]] <- gam(Yield ~ Sprayed + te(Longitude,Latitude,k=8),data=tmp.dat)
+tmp.dat$Yield <- predict(models.te[[2]])
+tmp.dat$K = 8
+te.dat <- rbind(te.dat, tmp.dat)
+
+summary(models.te[[1]])
+summary(models.te[[2]])
+```
+
+```{r,eval=FALSE}
+
+
+tmp.dat <- treated.2019.dat[,c('Longitude','Latitude','Yield','Sprayed')]
+models.te[[3]] <- gam(Yield ~ Sprayed + te(Longitude,Latitude,k=29),data=tmp.dat)
+tmp.dat$Yield <- predict(models.te[[3]])
+tmp.dat$K = 27
+te.dat <- rbind(te.dat, tmp.dat)
+
+
+```
+
+```{r,fig.width=9,fig.height=6,eval=FALSE}
+ggplot(te.dat, aes(Longitude,Latitude)) + 
+geom_point(aes(colour = Yield),size=1) + 
+scale_colour_gradient2(low=vermillion, mid=yellow, high=blue,midpoint = mean(te.dat$Yield)) +
+#scale_colour_gradient(low=cbPalette[8], high=cbPalette[5]) +
+labs(colour = "TP", x="Easting", y="Northing") + facet_wrap(~ K)
+
+ggplot(te.dat, aes(x=Yield)) + geom_histogram() + facet_wrap(~ K)
+```
+
+```{r,eval=FALSE}
+
+anova(models.te[[1]])
+plot(models.te[[1]])
+
+
+anova(models.te[[2]])
+plot(models.te[[2]])
+```
+
+# TP
+
+```{r,eval=FALSE}
+models.tp <- vector(mode='list',2)
+tp.dat <- NULL
+
+tmp.dat <- treated.2019.dat[,c('Longitude','Latitude','Yield','Sprayed')]
+models.tp[[1]] <- gam(Yield ~ Sprayed + te(Longitude,Latitude,bs=c("tp", "tp"),k=11),data=tmp.dat)
+tmp.dat$Yield <- predict(models.tp[[1]])
+tmp.dat$K = 11
+tp.dat <- rbind(tp.dat, tmp.dat)
+
+tmp.dat <- treated.2019.dat[,c('Longitude','Latitude','Yield','Sprayed')]
+models.tp[[2]] <- gam(Yield ~ Sprayed + te(Longitude,Latitude,bs=c("tp", "tp"),k=24),data=tmp.dat)
+tmp.dat$Yield <- predict(models.tp[[2]])
+tmp.dat$K = 24
+tp.dat <- rbind(tp.dat, tmp.dat)
+```
+
+```{r,fig.width=9,fig.height=6,eval=FALSE}
+ggplot(tp.dat, aes(Longitude,Latitude)) + 
+geom_point(aes(colour = Yield),size=1) + 
+scale_colour_gradient2(low=vermillion, mid=yellow, high=blue,midpoint = mean(tp.dat$Yield)) +
+#scale_colour_gradient(low=cbPalette[8], high=cbPalette[5]) +
+labs(colour = "TP", x="Easting", y="Northing") + facet_wrap(~ K)
+```
+
+```{r,fig.width=6,fig.height=3,eval=FALSE}
+ggplot(tp.dat, aes(x=Yield)) + geom_histogram() + facet_wrap(~ K)
+```
+
+```{r,eval=FALSE}
+summary(models.tp[[1]])
+anova(models.tp[[1]])
+#plot(models.tp[[1]])
+
+summary(models.tp[[2]])
+anova(models.tp[[2]])
+#plot(models.tp[[2]])
+
+anova(models.tp[[1]],models.tp[[2]])
+```
+
+```{r,eval=FALSE}
+install.packages("INLA",repos=c(getOption("repos"),INLA="https://inla.r-inla-download.org/R/testing"), dep=TRUE)
+inla.upgrade()
+inla.upgrade(testing=TRUE)
+#from git
+# R CMD INSTALL --build rinla
+```
+
+```{r,eval=FALSE}
+m <- 50
+points <- matrix(runif(m * 2), m, 2)
+
+mesh.2019 <- inla.mesh.2d(loc=treated.2019.dat[,c('Longitude','Latitude')],
+                           max.edge = c(0.05, 0.5))
+mesh <- inla.mesh.2d(loc = points, cutoff = 0.05, offset = c(0.1, 0.4),
+  max.edge = c(0.05, 0.5))
+```
+
+# MCMC/Bayesian Methods
+
+## Stan models
+
+```{r}
+library(brms)
+if(!file.exists('Stan.Rda')) {
+  fit.brms <- brm(Yield ~ Sprayed + s(Longitude,Latitude),data=treated.2019.dat)
+  save(fit.brms,file='Stan.Rda')
+  brms65 <- brm(Yield ~ Sprayed + s(Longitude,Latitude,k=65),data=treated.2019.dat)
+  save(fit.brms,brms65,file='Stan.Rda')
+  brms116 <- brm(Yield ~ Sprayed + s(Longitude,Latitude,k=116),data=treated.2019.dat)
+  save(fit.brms,brms65,brms116,file='Stan.Rda')
+  brms320 <- brm(Yield ~ Sprayed + s(Longitude,Latitude,k=320),data=treated.2019.dat)
+  save(fit.brms,brms65,brms116,brms320,file='Stan.Rda')
+} else {
+  load(file='Stan.Rda')
+}
+
+summary(fit.brms)
+#plot(fit.brms)
+
+summary(brms65)
+#plot(brms100)
+
+summary(brms116)
+
+summary(brms320)
+#plot(brms320)
+```
+
+spatialfusion
+```{r,eval=FALSE}
+library(spatialfusion)
+## example based on simulated data
+dat <- fusionSimulate(n.point = 20, n.area = 10, n.grid = 2, psill = 1, phi = 1, nugget = 0, tau.sq = 0.5,
+point.beta = list(rbind(1,5)), area.beta = list(rbind(-1, 0.5)), distributions = c("normal","poisson"), design.mat = matrix(c(1,1,1)))
+geo_data <- data.frame(x = dat$mrf[dat$sample.ind, "x"], y = dat$mrf[dat$sample.ind, "y"], cov.point = dat$data$X_point[,2],
+outcome = dat$data$Y_point[[1]]) lattice_data <- sp::SpatialPolygonsDataFrame(dat$poly,
+data.frame(outcome = dat$data$Y_area[[1]], cov.area = dat$data$X_area[,2]))
+dat_stan <- fusionData(geo.data = geo_data, geo.formula = outcome ~ cov.point, lattice.data = lattice_data, lattice.formula = outcome ~ cov.area,
+pp.data = dat$data$lgcp.coords[[1]], distributions = c("normal","poisson"), method = "Stan")
+mod_stan <- fusion(data = dat_stan, n.latent = 1, bans = 0, pp.offset = 1,
+prior.phi = list(distr = "normal", pars = c(1, 10))) summary(mod_stan)
+```
+
+piepho-11-2011
+
+
+From https://www.supergeotek.com/Spatial_Statistical_ENG_HTML/spherical_mode.htm
+```{r}
+n=5
+r=80
+d=(1:100)/100
+sph <- function(C0,C,h,a) {
+  if(h==0) {
+    return(0)
+  } else if (h > a) {
+    return(C0+C)
+  } else {
+    return(C0 + C*((3/2)*(h/a) - (1/2)*(h/a)^3))
+  }
+}
+y = d
+for(i in 1:length(d)) {
+  y[i]=sph(1,1,d[i],0.5)
+}
+ plot(d,y,ylim=c(0,2),type='l',ylab='Semivariance',xlab='Distance',main="Idealized Spherical Semivariogram")
+```

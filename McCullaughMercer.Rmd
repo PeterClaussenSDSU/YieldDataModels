@@ -1,0 +1,190 @@
+---
+title: "Overview"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+set.seed(1000)
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(gstat)
+library(splines)
+  grey <- "#999999"
+  orange <- "#E69F00"
+  skyblue <- "#56B4E9"
+  bluishgreen <- "#009E73"
+  yellow <- "#F0E442"
+  blue <- "#0072B2"
+  vermillion <- "#D55E00"
+  
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#F0E442","#CC79A7","#000000","#734f80", "#2b5a74", "#004f39", "#787221", "#003959", "#6aaf00", "#663cd3")
+
+source('./R/remove.harvest.outliers.fn.R')
+source('./R/spatial.model.selection.R')
+source('./R/select.best.variogram.R')
+source('./R/spatial.selection.plots.R')
+```
+
+
+## Load Data
+
+# Mercer and Hall
+```{r}
+wd <- getwd()
+setwd("./McCullagh")
+source('mercer.R')
+
+rowwidth
+colwidth
+rowsep
+colsep
+
+mercer.dat <- data.frame(Yield = rep(0,n),
+Longitude = rep(0,n),
+Latitude = rep(0,n))
+idx <- 0
+for (i in 1:nrows) {
+  for(j in 1:ncols) {
+    idx <- idx+1
+    mercer.dat$Latitude[idx]=i*(rowwidth)
+    mercer.dat$Longitude[idx]=j*(colwidth)
+    mercer.dat$Yield[idx] <- y1[idx]
+  }
+}
+
+mercer.dat$e <- mercer.dat$Longitude + (1/2)*colwidth
+mercer.dat$w <- mercer.dat$Longitude - (1/2)*colwidth
+mercer.dat$n <- mercer.dat$Latitude + (1/2)*rowwidth
+mercer.dat$s <- mercer.dat$Latitude - (1/2)*rowwidth
+
+base.plot <- ggplot(mercer.dat, aes(Longitude, Latitude)) + geom_point(aes(colour = Yield),size = 1) +
+scale_colour_gradient(low=cbPalette[7], high=cbPalette[4])
+
+base.plot <- base.plot + geom_segment(aes(x = e, y = s, xend = w, yend = s), 
+data = mercer.dat,color = cbPalette[3])
+base.plot <- base.plot + geom_segment(aes(x = e, y = n, xend = w, yend = n), 
+data = mercer.dat,color = cbPalette[3])
+base.plot <- base.plot + geom_segment(aes(x = e, y = n, xend = e, yend = s), 
+data = mercer.dat,color = cbPalette[3])
+base.plot <- base.plot + geom_segment(aes(x = w, y = n, xend = w, yend = s), 
+data = mercer.dat,color = cbPalette[3])
+
+setwd(wd)
+
+print(base.plot)
+
+#contourplot(Yield ~ Latitude * Longitude, data=mercer.dat)
+#levelplot(Yield ~ Latitude * Longitude, data=mercer.dat,col.regions = terrain.colors(12),at = c(-Inf, seq(min(mercer.dat$Yield), max(mercer.dat$Yield), length.out=10), Inf))
+
+range=c(1,12)
+Models.ns <- spatial.model.selection(mercer.dat,range=range,method='ns',models=12,moments=TRUE)
+Models.ns.plots <- spatial.selection.plots(Models.ns)
+
+print(Models.ns.plots$Selection)
+print(Models.ns.plots$Variogram)
+print(Models.ns.plots$Residuals)
+```
+
+```{r}
+mercer.dat <- data.frame(Yield = rep(0,n),
+Longitude = rep(0,n),
+Latitude = rep(0,n))
+idx <- 0
+for (i in 1:nrows) {
+  for(j in 1:ncols) {
+    idx <- idx+1
+    mercer.dat$Latitude[idx]=i*(rowwidth)#+sum(rowsep[1:i])
+    mercer.dat$Longitude[idx]=j*(colwidth)
+    if(j>1) {
+      mercer.dat$Longitude[idx]=mercer.dat$Longitude[idx]+sum(colsep[1:(j-1)])
+    }
+  }
+}
+
+mercer.dat$e <- mercer.dat$Longitude + (1/2)*colwidth
+mercer.dat$w <- mercer.dat$Longitude - (1/2)*colwidth
+mercer.dat$n <- mercer.dat$Latitude + (1/2)*rowwidth
+mercer.dat$s <- mercer.dat$Latitude - (1/2)*rowwidth
+
+base.plot <- ggplot(mercer.dat, aes(Longitude, Latitude)) + geom_point(aes(colour = Yield),size = 1) +
+scale_colour_gradient(low=cbPalette[7], high=cbPalette[4])
+
+base.plot <- base.plot + geom_segment(aes(x = e, y = s, xend = w, yend = s), 
+data = mercer.dat,color = cbPalette[3])
+base.plot <- base.plot + geom_segment(aes(x = e, y = n, xend = w, yend = n), 
+data = mercer.dat,color = cbPalette[3])
+base.plot <- base.plot + geom_segment(aes(x = e, y = n, xend = e, yend = s), 
+data = mercer.dat,color = cbPalette[3])
+base.plot <- base.plot + geom_segment(aes(x = w, y = n, xend = w, yend = s), 
+data = mercer.dat,color = cbPalette[3])
+
+setwd(wd)
+
+print(base.plot)
+
+range=c(1,12)
+Models.ns <- spatial.model.selection(mercer.dat,range=range,method='ns',models=12,moments=TRUE)
+Models.ns.plots <- spatial.selection.plots(Models.ns)
+
+print(Models.ns.plots$Selection)
+print(Models.ns.plots$Variogram)
+print(Models.ns.plots$Residuals)
+```
+
+
+```{r}
+range=c(1,12)
+Models.bs <- spatial.model.selection(mercer.dat,range=range,method='bs',models=12,moments=TRUE)
+Models.bs.plots <- spatial.selection.plots(Models.bs)
+
+print(Models.bs.plots$Selection)
+print(Models.bs.plots$Variogram)
+print(Models.bs.plots$Residuals)
+```
+
+
+```{r}
+range=c(10,300)
+Models.gam <- spatial.model.selection(mercer.dat,range=range,method='gam',models=12,moments=TRUE)
+Models.gam.plots <- spatial.selection.plots(Models.gam)
+
+print(Models.gam.plots$Selection)
+print(Models.gam.plots$Variogram)
+print(Models.gam.plots$Residuals)
+```
+
+
+```{r}
+range=c(2,20)
+Models.te <- spatial.model.selection(mercer.dat,range=range,method='te',models=12,moments=TRUE)
+Models.te.plots <- spatial.selection.plots(Models.te)
+
+print(Models.te.plots$Selection)
+print(Models.te.plots$Variogram)
+print(Models.te.plots$Residuals)
+```
+
+```{r}
+range=c(2,20)
+Models.tp <- spatial.model.selection(mercer.dat,range=range,method='tp',models=12,moments=TRUE)
+Models.tp.plots <- spatial.selection.plots(Models.tp)
+
+print(Models.tp.plots$Selection)
+print(Models.tp.plots$Variogram)
+print(Models.tp.plots$Residuals)
+```
+
+```{r}
+range=c(1,12)
+Models.lm <- spatial.model.selection(mercer.dat,range=range,method='lm',models=12,moments=TRUE)
+Models.lm.plots <- spatial.selection.plots(Models.lm)
+
+print(Models.lm.plots$Selection)
+print(Models.lm.plots$Variogram)
+print(Models.lm.plots$Residuals)
+```
+
+
+                  

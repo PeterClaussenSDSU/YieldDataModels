@@ -1,0 +1,88 @@
+---
+title: "Functional PCV"
+author: "Peter Claussen"
+date: "2024-04-22"
+output: html_document
+---
+
+As before, we start by working with Example 1, a split-planter variety comparison trial.
+
+```{r,echo=FALSE}
+load(file="~/Work/git/ASA_CSSA_SSSA/2017/Workshop/Case Study 2/Strips.Rda")
+library(mgcv)
+library(fda)
+```
+
+```{r,echo=FALSE}
+EastQuarter.dat$Pass <- floor(EastQuarter.dat$Northing/6)+1
+EastQuarter.dat$Pair <- floor((EastQuarter.dat$Pass+1)/2)
+EastQuarter.dat$Direction <- "Easterly"
+EastQuarter.dat$Direction[EastQuarter.dat$Heading>100] <- "Westerly"
+EastQuarter.dat$Direction <- as.factor(EastQuarter.dat$Direction)
+
+#EastQuarter.dat$Pass[EastQuarter.dat$Heading>100] <- EastQuarter.dat$Pass[EastQuarter.dat$Heading>100] + 400
+EastQuarter.dat$PassNo <- EastQuarter.dat$Pass
+
+EastQuarter.dat$Block <- ceiling(EastQuarter.dat$Pair/2)
+EastQuarter.dat$Strip <- EastQuarter.dat$Pair %/% EastQuarter.dat$Block
+EastQuarter.dat$Block <- as.factor(EastQuarter.dat$Block)
+EastQuarter.dat$Pass <- as.factor(EastQuarter.dat$Pass)
+EastQuarter.dat$Pair <- as.factor(EastQuarter.dat$Pair)
+EastQuarter.dat$Strip <- as.factor(EastQuarter.dat$Strip)
+```
+
+Functional principal component analysis can be executed using the `pca.fd` function, which takes the form 
+`pca.fd(fdobj, nharm=2, harmdfPar=fdPar(fdobj), centerfns=TRUE)` [@ramsay-2009], p102. `fdobj` is the functional data object containing the functional data, `nharm` specifies the number principal components to be retained. `harmdfpar` provides smoothing parameters for eigenfunctions. `centerfns` allows the subtraction of the mean function to be suppressed.
+
+We don't have data that are measured on at common intervals in space. The yield data in each harvest pass is sampled once per second, but we are most interested in samples over space. Thus, to create a set of functional data objects, we need to interpolate each harvest pass to a common spatial basis. We do this by fitting individual harvest passes use `mgcv` `gam` with the `ad` argument. As we've seen in previous sections, the `ad` argument produced very rough curves that seem to conform well to the original data. We may require further smoothing, but that will be accomplished using the `fda` objects.
+
+So we first compute a matrix of 24 rows by 198 columns; each column corresponds to an `ad` interpolation at 2 meter intervals, from 2 m from the western edge of the field to 398 meters `Easting`.
+
+```{r}
+smooth.basis <- rep(seq(2,398,by=2))
+total.passes <- max(EastQuarter.dat$PassNo)
+Smoothed.dat <- matrix(NA, nrow=total.passes,ncol=length(smooth.basis))
+for(i in 1:total.passes) {
+  current.pass <- EastQuarter.dat[EastQuarter.dat$PassNo==i,]
+  current.gam <- gam(Yield ~ s(Easting,bs="ad"),data=current.pass)
+  current.smoothed <- predict(current.gam, data.frame(Easting = smooth.basis))
+  Smoothed.dat[i,] <- current.smoothed
+}
+```
+
+`Smoothed.dat` is now a matrix with rows representing functional observations. We create an `fda` object
+
+```{r}
+times_basis = seq(2,398,length.out=199)
+Knots = seq(2,398,length.out=32) #Location of knots
+n_knots = length(Knots) #Number of knots
+n_order = 4 # order of basis functions: cubic bspline: order = 3 + 1
+n_basis = length(Knots) + n_order - 2;
+basis = create.bspline.basis(c(min(times_basis),max(times_basis)),n_basis,n_order,Knots)
+harvest.smooth.fd <- smooth.basis(times_basis, t(Smoothed.dat), fdParobj = basis)$fd
+harvest.smooth <- smooth.basis(times_basis, t(Smoothed.dat), fdParobj = basis)
+names(harvest.smooth) <- list("Easting", "Harvest Pass", "Yield")
+names(harvest.smooth.fd$fdnames) <- list("Easting", "Harvest Pass", "Yield")
+```
+
+```{r}
+plot(harvest.smooth.fd)
+```
+Now that we've got a proper `fda` object, and it looks correct. Now try `pca.fd`
+```{r,fig.width=8,fig.height=6}
+harvest.pca <- pca.fd(harvest.smooth.fd, nharm=8, harmfdPar=fdPar(harvest.smooth.fd), centerfns=TRUE)
+harvest.pca$varprop
+#par(mfrow=c(4,3))
+par(mfrow=c(2,1))
+plot(harvest.pca)
+```
+
+Now, there may be displacement of each harvest pass from the true GPS position of the harvester. We can try to minimize this displacement by registering the `fda` passes.
+
+```{r,include = FALSE}
+harvest.reg <- register.fd(yfd=harvest.smooth.fd)
+```
+
+```{r}
+plot(harvest.reg$regfd)
+```

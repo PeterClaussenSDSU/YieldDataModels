@@ -11,7 +11,9 @@ output:
 models=12
 knitr::opts_chunk$set(echo = TRUE)
 library(ggplot2)
+library(gridExtra)
 library(mgcv)
+library(splines)
 grey <- "#999999"
 orange <- "#E69F00"
 skyblue <- "#56B4E9"
@@ -22,7 +24,7 @@ vermillion <- "#D55E00"
 cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#F0E442","#CC79A7","#000000","#734f80", "#2b5a74", "#004f39", "#787221", "#003959", "#6aaf00", "#663cd3")
 ```
 
-```{r}
+```{r, include=FALSE}
 source('./R/remove.harvest.outliers.fn.R')
 source('./R/spatial.model.selection.R')
 source('./R/select.best.variogram.R')
@@ -45,24 +47,28 @@ Other analysis have been proposed. Here, we develop a geospatial based model to 
 We consider a spatial model for a strip trial of the form
 
 $$
-Z(\mathbf{s_i}) = \theta(\mathbf{s_i}) + Y(\mathbf{s_i}) + e(\mathbf{s_i})
+Z(\mathbf{s_i}) = \theta(\mathbf{s}_i) + Y(\mathbf{s}_i) + e(\mathbf{s}_i)
 $$
 
-The spatial model consists of three components. The first is the fixed effect component and includes the experimental treatments applied to point $\mathbf{s_i}$. The inherent response or fertility, in the absence of treatment, is represented as a random spatial field $Y$  that can be index by points $\mathbf{s_i}$. Finally, there is a white-noise error process $e$ associated with measurement of the realized random field, also indexed by \mathbf{s_i}.
+The spatial model consists of three components. The first is the fixed effect component and includes the experimental treatments applied to point $\mathbf{s_i}$. The inherent response or fertility, in the absence of treatment, is represented as a random spatial field $Y$  that can be index by points $\mathbf{s}_i$. Finally, there is a white-noise error process $e$ associated with measurement of the realized random field, also indexed by $\mathbf{s}_i$.
 
-## Selection of a smoothing parameter
+## Selecting a form for the random spatial field $Y$
+
+$Y(\mathbf{s_i})$ usually does not take a known, closed form formula. Instead, the specific realization of random spatial field is approximated using a series of low-order polynomials. In this section, we compare basis splines smoothers found using the R `lm` function and comparable splines in generalized additive models using the R library `mgcv`, specifically with the `gam` function.
 
 ###  Information Criteria
 
-Information criteria, such as AIC or BIC, are commonly used to select the 'best' number of parameters in a statistical model. These are calculated as subtracting, or penalizing, some value based on the number of parameters from the log-likelihood. The formula for AIC can be simplified to
+Information criteria, such as AIC or BIC, are commonly used to select the 'best' number of parameters in a statistical model. 
+
+These are calculated as adding, or penalizing, some value based on the number of parameters from the log-likelihood. The formula for AIC can be simplified to
 
 $$
-AIC = 2k - 2 \ln(\widehat{L})
+AIC = - 2 \ln(\widehat{L}) + 2k
 $$
 where $\widehat{L}$ is the maximum value of the likelihood function for model, ($L=P(X|\theta,M)$, with $X$ being the data and $M$ the model with parameters $\theta$) and $k$ is the number of parameters in the model. Similarly, BIC is given by
 
 $$
-BIC = k \ln(n) - 2 \ln(\widehat{L})
+BIC =  - 2 \ln(\widehat{L}) + k \ln(n)
 $$
 with $k$ and $\widehat{L}$ as before and $n$ is the number of observations in $X$. These criteria are well defined for methods that depend on maximum likelihood estimation, but are less well suited when other optimization methods are employed, such as the penalized maximum likelihood used in GAM (generalized additive models). In this paper, we consider alternative methods for selection an optimal number of parameters for smoothing a spatial random field, specifically the semivariogram.
 
@@ -74,27 +80,83 @@ $$
 Z(\mathbf{s_i}) = Y(\mathbf{s_i}) + e(\mathbf{s_i})
 $$
 
-One of the properties of a random field is the correlation structure among the various points $\mathbf{s_i}$. Specifically, the covariance function of two points $s_i$ and $s_i +h$ seperated by a distance $h$ is a function strictly of the distance $h$, when the spatial field is isotropic and stationary. We write this as
+One of the properties of a random field is the correlation structure among the various points $\mathbf{s_i}$. Specifically, the covariance function of two points $s_i$ and $s_i +h$ separated by a distance $h$ is a function strictly of the distance $h$, when the spatial field is isotropic and stationary. We write this as
 
 $$
-\gamma(h)
+var(Y(\mathbf{s} + \mathbf{h}) - Y(\mathbf{s} + \mathbf{h})) = 2\gamma_Y(\mathbf{h})
 $$
+
+that is, the variance between two points $\mathbf{s}_i + \mathbf{h}$  and $\mathbf{s}_i$ is strictly a function of the distance between the points, and is not influenced by absolute position or direction.
+
+The semivariogram usually starts at some non-zero point at the x origin (where x represesnts h, or the distance between two points). This non-zero value represents the nugget. The semivariogram usually rises along the x-axis, as the variance between points increases with distance. At some point the semivariogram become asymptotic; this upper limit is sometimes call the sill. Figure \@ref{fig:IdealSemivariogram} show an idealized semivariogram based on a spherical model.
+
+```{r,IdealSemivariogram,,fig.cap="Idealized spherical semivariogram",echo=FALSE}
+#From https://www.supergeotek.com/Spatial_Statistical_ENG_HTML/spherical_mode.htm
+n=5
+r=80
+d=(1:100)/100
+sph <- function(C0,C,h,a) {
+  if(h==0) {
+    return(0)
+  } else if (h > a) {
+    return(C0+C)
+  } else {
+    return(C0 + C*((3/2)*(h/a) - (1/2)*(h/a)^3))
+  }
+}
+y = d
+for(i in 1:length(d)) {
+  y[i]=sph(1,1,d[i],0.5)
+}
+ plot(d,y,ylim=c(0,2),type='l',ylab='Semivariance',xlab='Distance',main="Idealized Spherical Semivariogram")
+```
+
+We use semivariograms on both the fitted models and on the residuals of the fitted models. We consider the best fit model to produce a semivarigram that has a nugget near 0, as points not separated in space should have no covariance. We then look for the model with a nuggest not significantly different from 0, but produces the largest sill. This we take as evidence the the associated model has explained the majority of the spatial variation. Thus, we choose as the best most the most detailed model producing nugget not significantly different from 0. We call this the nugget selection.
+
+Alternative, we consider that if a proposed spatial model adequately fits the data, then the residuals will be a white-noise process and have no spatial correlation. In this case the semivariogram will be a flat line. We test each proposed spatial most and choose the simplest model that produces a residual semivariogram that is flat; that is, the slope of a simple regression of variance versus distance is statistically not different from 0. We call this the residual method.
+
+We compare these methods to more traditional methods of model selection, the adjusted $R^2$ and cross-validation. When fitting a model using `lm`, we use the $k$-fold cross validation method, as the preferred leave-one-out cross validation is too computationally expensive for these data; some strip trials have several thousand data points. For the GAM fit models, we use the generalized cross validation score provided as part of the model fit.
 
 # Materials and Methods
 
 ## Example 1
+```{r,echo=FALSE}
+load(file="~/Work/git/ASA_CSSA_SSSA/2017/Workshop/Case Study 2/Strips.Rda")
+```
+
+
+```{r,EastQuarterMaps,echo=FALSE,fig.width=8,fig.height=6}
+grid.arrange(
+  arrangeGrob(
+        ggplot(EastQuarter.dat, aes(Easting,Northing)) + 
+           geom_point(aes(colour = Product),size=2) + 
+           scale_colour_manual(values=cbPalette) +
+           #scale_colour_manual(values=cbPalette[pair.colors]) +
+           labs(colour = "Variety", x="Easting", y="Northing", title = "Seeding Map"),
+    ggplot(EastQuarter.dat, aes(Easting,Northing)) + 
+           geom_point(aes(colour = Yield),size=2) + 
+           scale_colour_gradient2(low=vermillion, mid=yellow, high=blue, midpoint = median(EastQuarter.dat$Yield)) +
+           labs(colour = "Yield", x="Easting", y="Northing",title="Harvest Map"),
+    nrow=2
+  )
+)
+```
 
 ## Example 2
+
+
 ```{r,echo=FALSE}
-treated.2019.dat <- read.csv(file='../ManagementZoneML/data/B 2019 Soybeans Treated.csv')
+treated.2019.dat <- read.csv(file='../ManagementZoneML/data/B 2019 Soybean Treated.csv')
 left = 1000
 treated.2019.dat <- treated.2019.dat[treated.2019.dat$Longitude >left,]
 treated.2019.dat$Pass <- treated.2019.dat$Block
 treated.2019.dat$Block <- as.factor(ceiling(treated.2019.dat$Pass/2))
 treated.2019.dat$Sprayed <- treated.2019.dat$Pass %in% c(2,4,6,8)
+treated.2019.dat$Easting <- treated.2019.dat$Longitude
+treated.2019.dat$Northing <- treated.2019.dat$Latitude
 ```
 
-```{r,echo=FALSE}
+```{r,echo=FALSE,include = FALSE,eval=FALSE}
 treated.2019.dat$SprayedRank <- rank(treated.2019.dat$Sprayed)
 treated.2019.dat$SprayedRank <- treated.2019.dat$SprayedRank/max(treated.2019.dat$SprayedRank)
 
@@ -105,33 +167,55 @@ MapsSprayed <- data.frame(Longitude=c(treated.2019.dat$Longitude,
                                 treated.2019.dat$Longitude),
                    Latitude=c(treated.2019.dat$Latitude,
                               treated.2019.dat$Latitude),
-                   Value=c(treated.2019.dat$SprayedRank,
-                           treated.2019.dat$YieldRank),
-                   Map=c(rep('Spray',length(treated.2019.dat$SprayedRank)),
-                         rep('Yield',length(treated.2019.dat$YieldRank))))
+                   Value=c(treated.2019.dat$Sprayed,
+                           treated.2019.dat$Yield),
+                   Map=c(rep('Spray',length(treated.2019.dat$Sprayed)),
+                         rep('Yield',length(treated.2019.dat$Yield))))
+
+#MapsSprayed <- data.frame(Longitude=c(treated.2019.dat$Longitude,
+#                                treated.2019.dat$Longitude),
+#                   Latitude=c(treated.2019.dat$Latitude,
+#                              treated.2019.dat$Latitude),
+#                   Value=c(treated.2019.dat$SprayedRank,
+#                           treated.2019.dat$YieldRank),
+#                   Map=c(rep('Spray',length(treated.2019.dat$SprayedRank)),
+#                         rep('Yield',length(treated.2019.dat$YieldRank))))
 ```
 
-```{r,echo=FALSE, fig.width=6, fig.height=4}
+```{r,echo=FALSE, fig.width=6, fig.height=4,eval=FALSE}
 ggplot(MapsSprayed, aes(Longitude,Latitude)) + 
 geom_point(aes(colour = Value),size=1) + 
 scale_colour_gradient2(low=vermillion, mid=yellow, high=blue, midpoint = 0.5) +
 labs(colour = "Relative Rank", x="Easting", y="Northing", title = "Fungicide Strip Trial (Raw data by rank)") + facet_wrap(~ Map)
 ```
 
-### Cleaning the data
+```{r,eval=FALSE}
+grid.arrange(
+  arrangeGrob(
+        ggplot(treated.2019.dat, aes(Easting,Northing)) + 
+           geom_point(aes(colour = Sprayed),size=2) + 
+           scale_colour_manual(values=cbPalette) +
+           #scale_colour_manual(values=cbPalette[pair.colors]) +
+           labs(colour = "Sparyed", x="Easting", y="Northing", title = "Spray Map"),
+    ggplot(treated.2019.dat, aes(Easting,Northing)) + 
+           geom_point(aes(colour = Yield),size=2) + 
+           scale_colour_gradient2(low=vermillion, mid=yellow, high=blue, midpoint = median(treated.2019.dat$Yield)) +
+           labs(colour = "Yield", x="Easting", y="Northing",title="Harvest Map"),
+    nrow=2
+  )
+)
+```
 
-The data were screen to remove outliers, specifically, yield values of 0, or greater than 80 bu/acre, were excluded from the data.
-```{r}
+
+```{r,echo=FALSE,include=FALSE}
 ggplot(treated.2019.dat, aes(x=Yield)) + geom_histogram()
 ggplot(treated.2019.dat, aes(sample = Yield)) + stat_qq() + stat_qq_line()
-treated.2019.dat <- treated.2019.dat[treated.2019.dat$Yield<80,]
-treated.2019.dat <- treated.2019.dat[treated.2019.dat$Yield>0,]
 ggplot(treated.2019.dat, aes(x=Yield)) + geom_histogram()
 ggplot(treated.2019.dat, aes(sample = Yield)) + stat_qq() + stat_qq_line()
 ```
 
 
-```{r}
+```{r,echo=FALSE}
 treated.2019.dat$SprayedRank <- rank(treated.2019.dat$Sprayed)
 treated.2019.dat$SprayedRank <- treated.2019.dat$SprayedRank/max(treated.2019.dat$SprayedRank)
 
@@ -155,551 +239,636 @@ scale_colour_gradient2(low=vermillion, mid=yellow, high=blue, midpoint = 0.5) +
 labs(colour = "Relative Rank", x="Easting", y="Northing", title = "Fungicide Strip Trial") + facet_wrap(~ Map)
 ```
 
-# Deterministic models
+## Algorithm
 
-Adding code from ModelSelectionG
+First, we select a range of $k$ values to consider. This is largely done by trial an error. We select a sufficiently large range (i.e. 40-400), then examine the variograms and adjust $k$ values to provide tighter coverage of the critical values.
 
 ```{r,echo=FALSE}
-harvests <-vector(mode='list',length=1)
-harvests[[1]] <- treated.2019.dat
-methods=c('ns',
-          'bs',
-          'gam',
-          'te',
-          'tp')
-          #'lm')
-# methods <- methods[1:2]
-# re c(2,9),
+require(gstat)
+require(mgcv)
+require(splines)
 
-ranges = matrix(c(c(3,35),
-                  c(3,35),
-                  c(40,320),
-                  c(3,32),
-                  c(3,32)),
-                 # c(2,24)),
-                ncol=2,byrow=TRUE)
-models=12
-
-Methods = vector(mode='list',length=length(methods))
-Years <- 2019
-```
-
-```{r,eval=FALSE}
-
-if(file.exists('Spatial.Methods.Rda')) {
-  load(file='Spatial.Methods.Rda')
-} else {
-
-
-for(j in 1:length(methods)) {
-
-  Models <- vector(mode='list',length=length(Years))
-  Plots <- vector(mode='list',length=length(Years))
-
-  for(i in 1:length(Years)) {
-    Models[[i]] <- spatial.model.selection(harvests[[i]],
-                                           range=ranges[j,],
-                                           method=methods[j],
-                                           models=models)
-    Plots[[i]] <- spatial.selection.plots(Models[[i]])
-    #print(summary(lm(Gamma ~ 0 + K + K:Distance,data=Models[[i]]$ResidualsData)))
-
-  }
-  
-  SelectionG <- NULL
-  BestBICG <- NULL
-  BestSlopeG <- NULL
-  BestNuggetG <- NULL
-
-  for(i in 1:length(Years)) {
-    tmp <- Models[[i]]$Selection
-    tmp$Year <- Years[i]
-    SelectionG <- rbind(SelectionG,tmp)
-  
-    tmp <- select.best.variogram(Models[[i]])
-    tmp$Year <- Years[i]
-    BestBICG <- rbind(BestBICG,tmp)
-
-    tmp <- select.best.variogram(Models[[i]],criteria='slope')
-    tmp$Year <- Years[i]
-    BestSlopeG <- rbind(BestSlopeG,tmp)
-    
-    tmp <- select.best.variogram(Models[[i]],criteria='nugget')
-    tmp$Year <- Years[i]
-    BestNuggetG <- rbind(BestNuggetG,tmp)
-  }
-#  Rprof(NULL)
-  
-  Methods[[j]] <- list(Models=Models,
-                       Plots=Plots,
-                       Selection=SelectionG,
-                       BestBIC=BestBICG,
-                       BestSlope=BestSlopeG,
-                       BestNugget=BestNuggetG)
-}
-  save(Methods,file='Spatial.Methods.Rda')
-}
-
-for(j in 1:length(methods)) {
-  for(i in 1:length(Years)) {
-    current <- Methods[[j]]
-    print(current$Plots[[i]])
-    print(reshape(current$Models[[i]]$Selection,direction = "wide",idvar = "K",timevar = "Criteria"))
-  }
-}
+k.vec = (1:10)*30
+b.vec = (1:10)*3
+models = length(k.vec)
+Models1 <- vector(mode='list',length=models)
+ModelsLM1 <- vector(mode='list',length=models)
 ```
 
 
-# Including Parametric Effects
+```{r,echo=FALSE}
+#We save predicted values from the various smoothers for plotting.
+Predicted1 <- NULL
+PredictedLM1 <- NULL
+```
 
-```{r}
-if(file.exists('ModelsFixed.Rda')) {
-  load(file='ModelsFixed.Rda')
-} else {
-  Methods <- vector(mode='list',length=length(methods))
-  for(j in 1:length(methods)) {
+```{r,echo=FALSE}
+#We compute variograms independently for both predicted values from the smoothers and for the residuals.
+PredictedVG1 <- vector(models+1,mode='list')
+ResidualsVG1 <- vector(models+1,mode='list')
+PredictedVGLM1 <- vector(models+1,mode='list')
+ResidualsVGLM1 <- vector(models+1,mode='list')
+```
+
+```{r,include=FALSE}
+#For reference, we compute a variogram for the raw `Yield` values, and save variograms values for each level of $k$.
+tmp.var <- variogram(Yield~1, 
+                     locations=~Easting+Northing,
+                      data=EastQuarter.dat)
+  
+PredictedVGData1 <-  data.frame(Distance=tmp.var$dist,
+                               Gamma=tmp.var$gamma,
+                               K=0)
+ResidualsVGData1 <-  PredictedVGData1
+PredictedVGDataLM1 <-  data.frame(Distance=tmp.var$dist,
+                               Gamma=tmp.var$gamma,
+                               K=0)
+ResidualsVGDataLM1 <-  PredictedVGDataLM1
+```  
+  
+  
+```{r,include=FALSE}
+GAM1AdjR2 <- 1:(length(k.vec)+1)
+GAM1GCV <- 1:(length(k.vec)+1)
+
+null.model <- gam(Yield ~ Product,data=EastQuarter.dat[,c('Yield','Product','Northing','Easting')])
+
+default.model <- gam(Yield ~ Product+s(Easting,Northing), data=EastQuarter.dat[,c('Yield','Product','Northing','Easting')])
+
+null.summary <- summary(null.model)
+GAM1AdjR2[1] <- null.summary$r.sq
+GAM1GCV[1] <- null.summary$sp.criterion
+for(i in 1:length(k.vec)) {
+  tmp.dat <- EastQuarter.dat[, c('Yield','Product','Northing','Easting')]
+  fmla <- paste('Yield ~ Product + s(Easting,Northing,k=',k.vec[i],')')
+  Models1[[i]] <- gam(as.formula(fmla),data=tmp.dat)
+  
+  gam.summary <- summary(Models1[[i]])
+  GAM1AdjR2[i+1] <- gam.summary$r.sq
+  GAM1GCV[i+1] <- gam.summary$sp.criterion
+
+  tmp.dat$Yield <- predict(Models1[[i]])
+  tmp.dat$K = k.vec[i]
+  tmp.dat$Residuals <- residuals(Models1[[i]])
     
-    ModelsFixed <- vector(mode='list',length=length(Years))
-    PlotsFixed <- vector(mode='list',length=length(Years))
+  Predicted1 <- rbind(Predicted1, tmp.dat)
     
-    for(i in 1:length(Years)) {
-      ModelsFixed[[i]] <- spatial.model.selection(harvests[[i]],
-                                                  fixed='Sprayed',
-                                                  range=ranges[j,],
-                                                  method=methods[j],
-                                                  models=models)
-      PlotsFixed[[i]] <- spatial.selection.plots(ModelsFixed[[i]])
-      print(PlotsFixed[[i]])
-      #print(summary(lm(Gamma ~ 0 + K + K:Distance,data=Models[[i]]$ResidualsData)))
-    }
-    
-    
-    
-    SelectionG <- NULL
-    BestBICG <- NULL
-    BestSlopeG <- NULL
-    BestNuggetG <- NULL
-    
-    for(i in 1:length(Years)) {
-      tmp <- ModelsFixed[[i]]$Selection
-      tmp$Year <- Years[i]
-      SelectionG <- rbind(SelectionG,tmp)
-      
-      tmp <- select.best.variogram(ModelsFixed[[i]])
-      tmp$Year <- Years[i]
-      BestBICG <- rbind(BestBICG,tmp)
-      
-      tmp <- select.best.variogram(ModelsFixed[[i]],criteria='slope')
-      tmp$Year <- Years[i]
-      BestSlopeG <- rbind(BestSlopeG,tmp)
-      
-      tmp <- select.best.variogram(ModelsFixed[[i]],criteria='nugget')
-      tmp$Year <- Years[i]
-      BestNuggetG <- rbind(BestNuggetG,tmp)
-    }
-    #  Rprof(NULL)
-    
-    Methods[[j]] <- list(Models=ModelsFixed,
-                         Plots=PlotsFixed,
-                         Selection=SelectionG,
-                         BestBIC=BestBICG,
-                         BestSlope=BestSlopeG,
-                         BestNugget=BestNuggetG)
-    
-    save(ModelsFixed,PlotsFixed,Methods,file='ModelsFixed.Rda')
+  tmp.var <- variogram(Yield~1,  locations=~Easting+Northing,  data=tmp.dat)
+  PredictedVG1[[i+1]] <- tmp.var
+
+  PredictedVGData1 <- rbind(PredictedVGData1,
+                         data.frame(Distance=tmp.var$dist,
+                                    Gamma=tmp.var$gamma,
+                                     K=k.vec[i]))
+  tmp.var <- variogram(Residuals~1, locations=~Easting+Northing, data=tmp.dat)
+  ResidualsVG1[[i+1]] <- tmp.var
+  ResidualsVGData1 <- rbind(ResidualsVGData1,
+                             data.frame(Distance=tmp.var$dist,
+                                        Gamma=tmp.var$gamma,
+                                        K=k.vec[i]))
+}
+```
+
+```{r,include=FALSE}
+LM1AdjR2 <- 1:(length(k.vec)+1)
+KFoldCVLM1 <- 1:(length(k.vec)+1)
+
+#null model has no spatial information
+subdata = EastQuarter.dat[,c('Yield','Product','Northing','Easting')]
+nulllm.model <- lm(Yield ~ Product,data=subdata)
+current.summary <- summary(nulllm.model)
+LM1AdjR2[1] <- current.summary$adj.r.squared
+#compute k-fold cross validation
+#ordinary LOOCV takes several hours to compute for just one set of models.
+#we'll have k folds
+k=10
+#assign folds to data in groups of 10, at random. We do this in the order the data were collected to
+#be sure that that test data set is uniformly space throughout the field
+foldgroups <- ceiling(dim(subdata)[1]/k)
+maxidx = dim(subdata)[1]
+subdata$Fold <- 0
+for(j in 1:foldgroups) {
+  range = 1:10 + (j-1)*10
+  if(j*10>maxidx) {
+    range = ((j-1)*10):maxidx
+    subdata$Fold[range] <- sample(1:length(range))
+  } else {
+    subdata$Fold[range] <- sample(1:10)
   }
 }
+#now, hold out fold and fit model to training data
+sum <- 0
+FoldMSE <- 1:k
+for(j in 1:k) {
+  current.train <- subdata[subdata$Fold != j,]
+  current.test <- subdata[subdata$Fold == j,]
+  current.model <- lm(Yield ~ Product, data=current.train)
+  predicted <- predict(current.model, newdata = current.test)
+  FoldMSE[j] <- sum(predicted - current.test$Yield)^2/dim(current.test)[1]
+}
+KFoldCVLM1[1] <- mean(FoldMSE)
+```
+```{r,,include=FALSE,echo=FALSE}
+for(i in 1:length(k.vec)) {
+  
+  tmp.dat <- EastQuarter.dat[, c('Yield','Product','Northing','Easting')]
+  
+  fmla <- paste('Yield ~ Product + bs(Easting,df=',b.vec[i],')*bs(Northing,df=',b.vec[i],')')
+  ModelsLM1[[i]] <- lm(as.formula(fmla), data=tmp.dat)
+  #compute adjusted R2
+  current.summary <- summary(ModelsLM1[[i]])
+  LM1AdjR2[i+1] <- current.summary$adj.r.squared
+  #use the same folds as the null model
+  tmp.dat$Fold <- subdata$Fold
+  sum <- 0
+  FoldMSE <- 1:k
+  for(j in 1:k) {
+    current.train <- tmp.dat[tmp.dat$Fold != j,]
+    current.test <- tmp.dat[tmp.dat$Fold == j,]
+    current.model <- lm(as.formula(fmla), data=current.train)
+    predicted <- predict(current.model, newdata = current.test)
+    FoldMSE[j] <- sum(predicted - current.test$Yield)^2/dim(current.test)[1]
+ }
+  KFoldCVLM1[i+1] <- mean(FoldMSE)
+
+
+  tmp.dat$Yield <- predict(ModelsLM1[[i]])
+  tmp.dat$K = k.vec[i]
+  tmp.dat$Residuals <- residuals(ModelsLM1[[i]])
+    
+  PredictedLM1 <- rbind(PredictedLM1, tmp.dat)
+    
+  tmp.var <- variogram(Yield~1,  locations=~Easting+Northing,  data=tmp.dat)
+  PredictedVGLM1[[i+1]] <- tmp.var
+
+  PredictedVGDataLM1 <- rbind(PredictedVGDataLM1,
+                         data.frame(Distance=tmp.var$dist,
+                                    Gamma=tmp.var$gamma,
+                                     K=b.vec[i]))
+  tmp.var <- variogram(Residuals~1, locations=~Easting+Northing, data=tmp.dat)
+  ResidualsVGLM1[[i+1]] <- tmp.var
+  ResidualsVGDataLM1 <- rbind(ResidualsVGDataLM1,
+                             data.frame(Distance=tmp.var$dist,
+                                        Gamma=tmp.var$gamma,
+                                        K=b.vec[i]))
+}
 ```
 
-```{r}
-for(j in 1:length(methods)) {
-  for(i in 1:length(Years)) {
-    current <- Methods[[j]]
-    print(methods[j])
-    print(current$Plots[[i]])
-    print(reshape(current$Models[[i]]$Selection,direction = "wide",idvar = "K",timevar = "Criteria"))
+From the variograms, we fit linear models to characterize the variograms to automate selecting the 'best' variograms. For the Residual variograms, we wish to find the variogram with the slope of $\gamma$ versus $d$ nearest to zero, so we fit a linear model and select the smallest level of $k$ that produces a slope not significantly different than 0.
+
+For the predict yield variograms, we fit a spline model, and identify the largest level of $k$ that produces nugget effect not significantly different from 0. A nugget of 0 suggests that there is no white noise in the smoothing model; if there is a nugget effect in the predicted data we may have overfit the model and introduced excess noise in out smoother.
+
+```{r,include=FALSE}
+Slopes.dat <- data.frame(K=unique(ResidualsVGData1$K))
+tmp.lm <- lm(Gamma ~ Distance,data=ResidualsVGData1[ResidualsVGData1$K==0,])
+Slopes.dat$Intercept <- coef(tmp.lm)[1]
+Slopes.dat$Slope <- coef(tmp.lm)[2]
+sum <- summary(tmp.lm)
+Slopes.dat$T <- sum$coefficients['Distance','t value']
+Slopes.dat$P <- sum$coefficients['Distance','Pr(>|t|)']
+  
+tmp.lm <- lm(Gamma ~ bs(Distance),data=PredictedVGData1[PredictedVGData1$K==0,])
+Slopes.dat$Nugget <- coef(tmp.lm)[1]
+  
+  for (k in 1:length(Slopes.dat$K)) {
+    K <- Slopes.dat$K[k]
+    tmp.lm <- lm(Gamma ~ Distance,data=ResidualsVGData1[ResidualsVGData1$K==K,])
+    Slopes.dat$Intercept[k] <- coef(tmp.lm)[1]
+    Slopes.dat$Slope[k] <- coef(tmp.lm)[2]
+    sum <- summary(tmp.lm)
+    Slopes.dat$T[k] <- sum$coefficients['Distance','t value']
+    Slopes.dat$P[k] <- sum$coefficients['Distance','Pr(>|t|)']
+    tmp.lm <- lm(Gamma ~ bs(Distance),data=PredictedVGData1[PredictedVGData1$K==K,])
+    Slopes.dat$Nugget[k] <- coef(tmp.lm)[1]
+    sum <- summary(tmp.lm)
+    Slopes.dat$NuggetT[k] <- sum$coefficients[1,'t value']
+    Slopes.dat$NuggetP[k] <- sum$coefficients[1,'Pr(>|t|)']
   }
+  
+  SelectionGAM1 <- data.frame(K = rep(c(0,k.vec),4),
+                           #Criteria = as.factor(c(rep('AIC',models+1),
+                           #                        rep('BIC',models+1),
+                            Criteria = as.factor(c(rep('Adjusted R Squared',models+1),
+                                                   rep('Generalized Cross Validation',models+1),
+                                                   rep('Nugget',models+1),
+                                                   rep('Slope',models+1))),
+                            #Score = c(c(AIC(null.model),unlist(lapply(Models1,AIC))),
+                            #          c(BIC(null.model),unlist(lapply(Models1,BIC))),
+                            Score = c(GAM1AdjR2,
+                                      GAM1GCV,
+                                      Slopes.dat$NuggetP,
+                                      Slopes.dat$P)
+                            )
+#SelectionGAM  
+```
+
+```{r,include=FALSE}
+Slopes.dat <- data.frame(K=unique(ResidualsVGDataLM1$K))
+tmp.lm <- lm(Gamma ~ Distance,data=ResidualsVGDataLM1[ResidualsVGData1$K==0,])
+Slopes.dat$Intercept <- coef(tmp.lm)[1]
+Slopes.dat$Slope <- coef(tmp.lm)[2]
+sum <- summary(tmp.lm)
+Slopes.dat$T <- sum$coefficients['Distance','t value']
+Slopes.dat$P <- sum$coefficients['Distance','Pr(>|t|)']
+  
+tmp.lm <- lm(Gamma ~ bs(Distance),data=PredictedVGDataLM1[PredictedVGDataLM1$K==0,])
+Slopes.dat$Nugget <- coef(tmp.lm)[1]
+  
+  for (k in 1:length(Slopes.dat$K)) {
+    K <- Slopes.dat$K[k]
+    tmp.lm <- lm(Gamma ~ Distance,data=ResidualsVGDataLM1[ResidualsVGDataLM1$K==K,])
+    Slopes.dat$Intercept[k] <- coef(tmp.lm)[1]
+    Slopes.dat$Slope[k] <- coef(tmp.lm)[2]
+    sum <- summary(tmp.lm)
+    Slopes.dat$T[k] <- sum$coefficients['Distance','t value']
+    Slopes.dat$P[k] <- sum$coefficients['Distance','Pr(>|t|)']
+    tmp.lm <- lm(Gamma ~ bs(Distance),data=PredictedVGDataLM1[PredictedVGDataLM1$K==K,])
+    Slopes.dat$Nugget[k] <- coef(tmp.lm)[1]
+    sum <- summary(tmp.lm)
+    Slopes.dat$NuggetT[k] <- sum$coefficients[1,'t value']
+    Slopes.dat$NuggetP[k] <- sum$coefficients[1,'Pr(>|t|)']
+  }
+  
+  SelectionLM1 <- data.frame(K = rep(c(0,b.vec),4),
+                            #Criteria = as.factor(c(rep('AIC',models+1),
+                            #                       rep('BIC',models+1),
+                            Criteria = as.factor(c(rep('Adjusted R Squared',models+1),
+                                                   rep('K-Fold Cross Validation',models+1),
+                                                   rep('Nugget',models+1),
+                                                   rep('Slope',models+1))),
+                            #Score = c(c(AIC(nulllm.model),unlist(lapply(ModelsLM1,AIC))),
+                             #         c(BIC(nulllm.model),unlist(lapply(ModelsLM1,BIC))),
+                            Score = c(LM1AdjR2,
+                                      KFoldCVLM1,
+                                      Slopes.dat$NuggetP,
+                                      Slopes.dat$P)
+                            )
+#SelectionGAM  
+```
+
+## Example 2
+
+```{r,include=FALSE}
+k.vec2 = (1:10)*30
+models = length(k.vec2)
+b.vec = (1:10)*3
+
+Models2 <- vector(mode='list',length=models)
+ModelsLM2 <- vector(mode='list',length=models)
+
+Predicted2 <- NULL
+
+PredictedVG2 <- vector(models+1,mode='list')
+ResidualsVG2 <- vector(models+1,mode='list')
+
+tmp.var <- variogram(Yield~1, 
+                     locations=~Easting+Northing,
+                      data=treated.2019.dat)
+  
+PredictedVGData2 <-  data.frame(Distance=tmp.var$dist,
+                               Gamma=tmp.var$gamma,
+                               K=0)
+ResidualsVGData2 <-  PredictedVGData2
+
+null.model2 <- gam(Yield ~ Sprayed,data=treated.2019.dat[,c('Yield','Sprayed','Northing','Easting')])
+default.model2 <- gam(Yield ~ Sprayed+s(Easting,Northing), data=treated.2019.dat[,c('Yield','Sprayed','Northing','Easting')])
+for(i in 1:length(k.vec)) {
+  tmp.dat <- treated.2019.dat[, c('Yield','Sprayed','Northing','Easting')]
+  fmla <- paste('Yield ~ Sprayed + s(Easting,Northing,k=',k.vec[i],')')
+  Models2[[i]] <- gam(as.formula(fmla),data=tmp.dat)
+  
+  fmla <- paste('Yield ~ Sprayed + bs(Easting,df=',b.vec[i],')*bs(Northing,df=',b.vec[i],')')
+  ModelsLM2[[i]] <- lm(as.formula(fmla), data=tmp.dat)
+  
+  tmp.dat$Yield <- predict(Models2[[i]])
+  tmp.dat$K = k.vec[i]
+  tmp.dat$Residuals <- residuals(Models2[[i]])
+    
+  Predicted2 <- rbind(Predicted2, tmp.dat)
+    
+  tmp.var <- variogram(Yield~1,  locations=~Easting+Northing,  data=tmp.dat)
+  PredictedVG2[[i+1]] <- tmp.var
+
+  PredictedVGData2 <- rbind(PredictedVGData2,
+                         data.frame(Distance=tmp.var$dist,
+                                    Gamma=tmp.var$gamma,
+                                     K=k.vec[i]))
+  tmp.var <- variogram(Residuals~1, locations=~Easting+Northing, data=tmp.dat)
+  ResidualsVG2[[i+1]] <- tmp.var
+  ResidualsVGData2 <- rbind(ResidualsVGData2,
+                             data.frame(Distance=tmp.var$dist,
+                                        Gamma=tmp.var$gamma,
+                                        K=k.vec[i]))
+}
+
+Slopes.dat2 <- data.frame(K=unique(ResidualsVGData2$K))
+tmp.lm <- lm(Gamma ~ Distance,data=ResidualsVGData2[ResidualsVGData2$K==0,])
+Slopes.dat2$Intercept <- coef(tmp.lm)[1]
+Slopes.dat2$Slope <- coef(tmp.lm)[2]
+sum <- summary(tmp.lm)
+Slopes.dat2$T <- sum$coefficients['Distance','t value']
+Slopes.dat2$P <- sum$coefficients['Distance','Pr(>|t|)']
+  
+tmp.lm <- lm(Gamma ~ bs(Distance),data=PredictedVGData2[PredictedVGData2$K==0,])
+Slopes.dat2$Nugget <- coef(tmp.lm)[1]
+  
+  for (k in 1:length(Slopes.dat2$K)) {
+    K <- Slopes.dat2$K[k]
+    tmp.lm <- lm(Gamma ~ Distance,data=ResidualsVGData2[ResidualsVGData2$K==K,])
+    Slopes.dat2$Intercept[k] <- coef(tmp.lm)[1]
+    Slopes.dat2$Slope[k] <- coef(tmp.lm)[2]
+    sum <- summary(tmp.lm)
+    Slopes.dat2$T[k] <- sum$coefficients['Distance','t value']
+    Slopes.dat2$P[k] <- sum$coefficients['Distance','Pr(>|t|)']
+    tmp.lm <- lm(Gamma ~ bs(Distance),data=PredictedVGData2[PredictedVGData2$K==K,])
+    Slopes.dat2$Nugget[k] <- coef(tmp.lm)[1]
+    sum <- summary(tmp.lm)
+    Slopes.dat2$NuggetT[k] <- sum$coefficients[1,'t value']
+    Slopes.dat2$NuggetP[k] <- sum$coefficients[1,'Pr(>|t|)']
+  }
+  
+  SelectionGAM2 <- data.frame(K = rep(c(0,k.vec),4),
+                            Criteria = as.factor(c(rep('AIC',models+1),
+                                                   rep('BIC',models+1),
+                                                   rep('Nugget',models+1),
+                                                   rep('Slope',models+1))),
+                            Score = c(c(AIC(null.model2),unlist(lapply(Models2,AIC))),
+                                      c(BIC(null.model2),unlist(lapply(Models2,BIC))),
+                                      Slopes.dat2$NuggetP,
+                                      Slopes.dat2$P)
+                            )
+```
+
+
+```{r,include=FALSE}
+k.vec2 = (1:10)*30
+models = length(k.vec2)
+b.vec = (1:10)*3
+
+ModelsLM2 <- vector(mode='list',length=models)
+
+PredictedLM2 <- NULL
+
+PredictedVGLM2 <- vector(models+1,mode='list')
+ResidualsVGLM2 <- vector(models+1,mode='list')
+
+tmp.var <- variogram(Yield~1, 
+                     locations=~Easting+Northing,
+                      data=treated.2019.dat)
+  
+PredictedVGDataLM2 <-  data.frame(Distance=tmp.var$dist,
+                               Gamma=tmp.var$gamma,
+                               K=0)
+ResidualsVGDataLM2 <-  PredictedVGDataLM2
+
+nulllm.model2 <- lm(Yield ~ Sprayed,data=treated.2019.dat[,c('Yield','Sprayed','Northing','Easting')])
+for(i in 1:length(k.vec)) {
+  tmp.dat <- treated.2019.dat[, c('Yield','Sprayed','Northing','Easting')]
+  
+  fmla <- paste('Yield ~ Sprayed + bs(Easting,df=',b.vec[i],')*bs(Northing,df=',b.vec[i],')')
+  ModelsLM2[[i]] <- lm(as.formula(fmla), data=tmp.dat)
+  
+  tmp.dat$Yield <- predict(ModelsLM2[[i]])
+  tmp.dat$K = k.vec[i]
+  tmp.dat$Residuals <- residuals(ModelsLM2[[i]])
+    
+  PredictedLM2 <- rbind(Predicted2, tmp.dat)
+    
+  tmp.var <- variogram(Yield~1,  locations=~Easting+Northing,  data=tmp.dat)
+  PredictedVGLM2[[i+1]] <- tmp.var
+
+  PredictedVGDataLM2 <- rbind(PredictedVGDataLM2,
+                         data.frame(Distance=tmp.var$dist,
+                                    Gamma=tmp.var$gamma,
+                                     K=b.vec[i]))
+  tmp.var <- variogram(Residuals~1, locations=~Easting+Northing, data=tmp.dat)
+  ResidualsVGLM2[[i+1]] <- tmp.var
+  ResidualsVGDataLM2 <- rbind(ResidualsVGDataLM2,
+                             data.frame(Distance=tmp.var$dist,
+                                        Gamma=tmp.var$gamma,
+                                        K=b.vec[i]))
+}
+
+Slopes.dat2 <- data.frame(K=unique(ResidualsVGDataLM2$K))
+tmp.lm <- lm(Gamma ~ Distance,data=ResidualsVGDataLM2[ResidualsVGDataLM2$K==0,])
+Slopes.dat2$Intercept <- coef(tmp.lm)[1]
+Slopes.dat2$Slope <- coef(tmp.lm)[2]
+sum <- summary(tmp.lm)
+Slopes.dat2$T <- sum$coefficients['Distance','t value']
+Slopes.dat2$P <- sum$coefficients['Distance','Pr(>|t|)']
+  
+tmp.lm <- lm(Gamma ~ bs(Distance),data=PredictedVGDataLM2[PredictedVGDataLM2$K==0,])
+Slopes.dat2$Nugget <- coef(tmp.lm)[1]
+  
+  for (k in 1:length(Slopes.dat2$K)) {
+    K <- Slopes.dat2$K[k]
+    tmp.lm <- lm(Gamma ~ Distance,data=ResidualsVGDataLM2[ResidualsVGDataLM2$K==K,])
+    Slopes.dat2$Intercept[k] <- coef(tmp.lm)[1]
+    Slopes.dat2$Slope[k] <- coef(tmp.lm)[2]
+    sum <- summary(tmp.lm)
+    Slopes.dat2$T[k] <- sum$coefficients['Distance','t value']
+    Slopes.dat2$P[k] <- sum$coefficients['Distance','Pr(>|t|)']
+    tmp.lm <- lm(Gamma ~ bs(Distance),data=PredictedVGDataLM2[PredictedVGDataLM2$K==K,])
+    Slopes.dat2$Nugget[k] <- coef(tmp.lm)[1]
+    sum <- summary(tmp.lm)
+    Slopes.dat2$NuggetT[k] <- sum$coefficients[1,'t value']
+    Slopes.dat2$NuggetP[k] <- sum$coefficients[1,'Pr(>|t|)']
+  }
+  
+  SelectionLM2 <- data.frame(K = rep(c(0,b.vec),4),
+                            Criteria = as.factor(c(rep('AIC',models+1),
+                                                   rep('BIC',models+1),
+                                                   rep('Nugget',models+1),
+                                                   rep('Slope',models+1))),
+                            Score = c(c(AIC(nulllm.model2),unlist(lapply(ModelsLM2,AIC))),
+                                      c(BIC(nulllm.model2),unlist(lapply(ModelsLM2,BIC))),
+                                      Slopes.dat2$NuggetP,
+                                      Slopes.dat2$P)
+                            )
+```
+
+# Results
+
+## Example 1
+
+```{r,SelectionLM1, fig.cap="Selection criteria for linear regression fit basis splines models",echo=FALSE}
+ggplot(SelectionLM1, aes(K,Score)) + 
+    geom_point(aes(colour = Criteria),size=2) + 
+    geom_line(aes(colour = Criteria),size=1) + 
+    scale_colour_manual(values=cbPalette) + facet_wrap(~Criteria,nrow=3,scales="free_y") +
+    labs(title="Scores for LM smoothers", x ="Smoothing Parameter", y = "Score")
+```
+
+```{r,SelectionGAM1, fig.cap="Selection criteria for GAM fit basis splines models",echo=FALSE}
+ggplot(SelectionGAM1, aes(K,Score)) + 
+    geom_point(aes(colour = Criteria),size=2) + 
+    geom_line(aes(colour = Criteria),size=1) + 
+    scale_colour_manual(values=cbPalette) + facet_wrap(~Criteria,nrow=3,scales="free_y") +
+    labs(title="Scores for GAM smoothers", x ="Smoothing Parameter", y = "Score")
+```
+
+
+
+```{r,include=FALSE,echo=FALSE}
+summary(null.model)
+summary(default.model)
+summary(Models1[[8]])
+summary(Models1[[9]])
+```
+
+```{r,include=FALSE,echo=FALSE}
+gam.check(default.model)
+gam.check(Models1[[8]])
+gam.check(Models1[[9]])
+```
+
+
+```{r,VariogramsGAM1, fig.cap="Variograms for GAM basis spline models fit to data from Example 1", echo=FALSE}
+PredictedVGData1$Source <- "Smoothed Yield"
+ResidualsVGData1$Source <- "Residuals"
+side.dat <- rbind(PredictedVGData1,ResidualsVGData1)
+side.dat$K <- factor(side.dat$K)
+
+ggplot(side.dat, aes(Distance,Gamma)) + 
+    geom_point(aes(colour = K),size=2) + 
+    geom_smooth(aes(group = K,color=K), se=FALSE,alpha=0.5) +
+    scale_colour_manual(values=c(cbPalette,cbPalette)) + 
+    labs(title=paste('Variograms, GAM, Model 1'), x ="Distance (m)", y = "Covariance") +
+    facet_wrap(~ Source, scales = "free")
+```
+
+```{r,VariogramsLM1, fig.cap="Variograms for linear regression basis spline models fit to data from Example 1",}
+PredictedVGDataLM1$Source <- "Smoothed Yield"
+ResidualsVGDataLM1$Source <- "Residuals"
+side.dat <- rbind(PredictedVGDataLM1,ResidualsVGDataLM1)
+side.dat$K <- factor(side.dat$K)
+
+ggplot(side.dat, aes(Distance,Gamma)) + 
+    geom_point(aes(colour = K),size=2) + 
+    geom_smooth(aes(group = K,color=K), se=FALSE,alpha=0.5) +
+    scale_colour_manual(values=c(cbPalette,cbPalette)) + 
+    labs(title=paste('Variograms, LM, Example 1'), x ="Distance (m)", y = "Covariance") +
+    facet_wrap(~ Source, scales = "free")
+```
+
+## Example 2
+
+```{r,ModelSelectionGAM2, fig.cap="Model selection criteria for GAM basis spline models fit to data from example 2", echo=FALSE}
+ggplot(SelectionGAM2, aes(K,Score)) + 
+    geom_point(aes(colour = Criteria),size=2) + 
+    geom_line(aes(colour = Criteria),size=1) + 
+    scale_colour_manual(values=cbPalette) + facet_wrap(~Criteria,nrow=3,scales="free_y") +
+    labs(title="Scores for GAM smoothers", x ="Smoothing Parameter", y = "Score")
+```
+
+```{r,ModelSelectionLM2, fig.cap="Model selection criteria for GAM basis spline models fit to data from example 2", echo=FALSE}
+ggplot(SelectionLM2, aes(K,Score)) + 
+    geom_point(aes(colour = Criteria),size=2) + 
+    geom_line(aes(colour = Criteria),size=1) + 
+    scale_colour_manual(values=cbPalette) + facet_wrap(~Criteria,nrow=3,scales="free_y") +
+    labs(title="Scores for GAM smoothers", x ="Smoothing Parameter", y = "Score")
+```
+
+```{r,eval=FALSE}
+summary(null.model2)
+summary(default.model2)
+summary(Models2[[6]])
+summary(Models2[[7]])
+```
+
+```{r,eval=FALSE}
+gam.check(default.model2)
+gam.check(Models2[[6]])
+gam.check(Models2[[7]])
+```
+
+```{r,VariogramsGAM2, fig.cap="Variograms for GAM basis spline models fit to data from Example 2", echo=FALSE}
+PredictedVGData2$Source <- "Smoothed Yield"
+ResidualsVGData2$Source <- "Residuals"
+side.dat <- rbind(PredictedVGData2,ResidualsVGData2)
+side.dat$K <- factor(side.dat$K)
+
+ggplot(side.dat, aes(Distance,Gamma)) + 
+    geom_point(aes(colour = K),size=2) + 
+    geom_smooth(aes(group = K,color=K), se=FALSE,alpha=0.5) +
+    scale_colour_manual(values=c(cbPalette,cbPalette)) + 
+    labs(title=paste('Variograms, GAM, Example 2'), x ="Distance (m)", y = "Covariance") +
+    facet_wrap(~ Source)
+```
+
+```{r,VariogramsLM2, fig.cap="Variograms for linear regression basis spline models fit to data from Example 2", echo=FALSE}
+PredictedVGDataLM2$Source <- "Smoothed Yield"
+ResidualsVGDataLM2$Source <- "Residuals"
+side.dat <- rbind(PredictedVGDataLM2,ResidualsVGDataLM2)
+side.dat$K <- factor(side.dat$K)
+
+ggplot(side.dat, aes(Distance,Gamma)) + 
+    geom_point(aes(colour = K),size=2) + 
+    geom_smooth(aes(group = K,color=K), se=FALSE,alpha=0.5) +
+    scale_colour_manual(values=c(cbPalette,cbPalette)) + 
+    labs(title=paste('Variograms, LM, Example 2'), x ="Distance (m)", y = "Covariance") +
+    facet_wrap(~ Source)
+```
+
+```{r}
+Coef = c()
+Source = c()
+K = c()
+
+for(i in 1:length(k.vec)) {
+  coefs <- coef(Models1[[i]])
+  Coef <- c(Coef,coefs[2])
+  Source <- c(Source, "GAM")
+  K <- c(K,k.vec[i])
+  
+  coefs <- coef(ModelsLM1[[i]])
+  Coef <- c(Coef,coefs[2])
+  Source <- c(Source, "LM")
+  K <- c(K,b.vec[i])
 }
 ```
 
-```{r,echo=FALSE,fig.width=6,fig.height=6}
-SummaryBIC <- NULL
-SummarySlope <- NULL
-SummaryNugget <- NULL
+```{r}
+Plot1 <- data.frame(Coef=Coef,Source=Source,K=K)
+ggplot(Plot1, aes(K,Coef)) + 
+    geom_point(aes(colour = Source),size=2) + 
+    geom_line(aes(colour = Source),size=1) + 
+    scale_colour_manual(values=cbPalette) + #facet_wrap(~Criteria,nrow=3,scales="free_y") +
+    labs(title="Coefficients, Example 1", x ="Smoothing Parameter", y = "Product Effect Estimate") + facet_wrap(~Source,scales="free_x")
+```
 
-pooled <- NULL
-for(i in 1:length(methods)) {
-  BestBIC <- Methods[[i]]$BestBIC
-  BestBIC$Year <- factor(BestBIC$Year)
-  BestBIC$Criteria <- 'BIC'
-  
-  BestSlope <- Methods[[i]]$BestSlope
-  BestSlope$Year <- factor(BestSlope$Year)
-  BestSlope$Criteria <- 'Slope'
-  
-  BestNugget <- Methods[[i]]$BestNugget
-  BestNugget$Year <- factor(BestNugget$Year)
-  BestNugget$Criteria <- 'Nugget'
+```{r}
+Coef = c()
+Source = c()
+K = c()
 
-  current <- rbind(BestNugget,BestSlope,BestBIC)
-
-  current$Method <- methods[i]
-  pooled <- rbind(pooled, current)
-  BestBIC$Method <- methods[i]
-  BestSlope$Method <- methods[i]
-  BestNugget$Method <- methods[i]
+for(i in 1:length(k.vec)) {
+  coefs <- coef(Models2[[i]])
+  Coef <- c(Coef,coefs[2])
+  Source <- c(Source, "GAM")
+  K <- c(K,k.vec[i])
   
-  SummaryBIC <- rbind(SummaryBIC,BestBIC)
-  SummarySlope <- rbind(SummarySlope,BestSlope)
-  SummaryNugget <- rbind(SummaryNugget,BestNugget)
+  coefs <- coef(ModelsLM2[[i]])
+  Coef <- c(Coef,coefs[2])
+  Source <- c(Source, "LM")
+  K <- c(K,b.vec[i])
 }
 ```
 
-```{r,echo=FALSE,fig.width=8,fig.height=4}
-ggplot(pooled[pooled$Source=='Model',], aes(Distance,Gamma)) + 
-    geom_point(aes(colour = Method),size=2) + 
-    geom_smooth(aes(group = Method,color=Year), se=FALSE) +
-    scale_colour_manual(values=c(cbPalette)) + facet_wrap(~Criteria) +
-    labs(title = "Semivariogram Selection, Model Variograms")
-```
-
-
-```{r,echo=FALSE,fig.width=8,fig.height=4}
-ggplot(pooled[pooled$Source=='Residuals',], aes(Distance,Gamma)) + 
-    geom_point(aes(colour = Method),size=2) + 
-    geom_smooth(aes(group = Method,color=Year), se=FALSE) +
-    scale_colour_manual(values=c(cbPalette)) + facet_wrap(~Criteria) +
-    labs(title = "Nugget Selection, Model Variograms")
-```
-
 ```{r}
-pooled[pooled$Distance<20 & pooled$Source == "Model",]
-
-```
-
-
-
-
-
-
-
-
-
-
-
-
-## Natural splines
-```{r}
-library(splines)
-
-models.ns.lm <- vector(mode='list',length=3)
-ns.dat <- NULL
-
-tmp.dat <- treated.2019.dat[,c('Longitude','Latitude','Yield','Sprayed')]
-df=9
-null.ns.9.lm <- lm(Yield ~ ns(Longitude,df=df)*ns(Latitude,df=df), data=tmp.dat)
-models.ns.lm[[1]] <- lm(Yield ~ Sprayed + ns(Longitude,df=df)*ns(Latitude,df=df), data=tmp.dat)
-tmp.dat$Yield <- predict(models.ns.lm[[1]])
-tmp.dat$DF = df
-ns.dat <- rbind(ns.dat, tmp.dat)
-
-tmp.dat <- treated.2019.dat[,c('Longitude','Latitude','Yield','Sprayed')]
-df=9
-models.ns.lm[[2]] <- lm(Yield ~ Sprayed + ns(Longitude,df=df)*ns(Latitude,df=df), data=tmp.dat)
-tmp.dat$Yield <- predict(models.ns.lm[[2]])
-tmp.dat$DF = df
-ns.dat <- rbind(ns.dat, tmp.dat)
-
-tmp.dat <- treated.2019.dat[,c('Longitude','Latitude','Yield','Sprayed')]
-df=26
-null.ns.26.lm <- lm(Yield ~ ns(Longitude,df=df)*ns(Latitude,df=df), data=tmp.dat)
-models.ns.lm[[3]] <- lm(Yield ~ Sprayed + ns(Longitude,df=df)*ns(Latitude,df=df), data=tmp.dat)
-tmp.dat$Yield <- predict(models.ns.lm[[3]])
-tmp.dat$DF = df
-ns.dat <- rbind(ns.dat, tmp.dat)
-```
-
-```{r}
-#summary(models.ns.lm[[1]])
-anova(models.ns.lm[[1]])
-anova(null.ns.9.lm,models.ns.lm[[1]])
-anova(null.ns.9.lm,models.ns.lm[[1]],test="LRT")
-#summary(models.ns.lm[[2]])
-anova(models.ns.lm[[2]])
-anova(null.ns.26.lm,models.ns.lm[[2]])
-anova(null.ns.26.lm,models.ns.lm[[2]],test="LRT")
-```
-
-```{r}
-coef(models.ns.lm[[1]])[1:2]
-coef(models.ns.lm[[2]])[1:2]
-coef(models.ns.lm[[3]])[1:2]
-```
-
-
-```{r,fig.width=9,fig.height=6}
-ggplot(ns.dat, aes(Longitude,Latitude)) + 
-geom_point(aes(colour = Yield),size=1) + 
-scale_colour_gradient2(low=vermillion, mid=yellow, high=blue,midpoint = mean(ns.dat$Yield)) +
-labs(colour = "Lm with natural spline", x="Easting", y="Northing") + facet_wrap(~ DF)
-```
-
-```{r,fig.width=6,fig.height=3}
-ggplot(ns.dat, aes(x=Yield)) + geom_histogram() + facet_wrap(~ DF)
-```
-
-## B-splines
-
-12 df may be too many for bs; we have NA at 12
-```{r}
-models.bs.lm <- vector(mode='list',length=3)
-bs.dat <- NULL
-
-tmp.dat <- treated.2019.dat[,c('Longitude','Latitude','Yield','Sprayed')]
-df=9
-models.bs.lm[[1]] <- lm(Yield ~ Sprayed + bs(Longitude,df=df)*bs(Latitude,df=df), data=tmp.dat)
-
-tmp.dat$Yield <- predict(models.bs.lm[[1]])
-tmp.dat$DF = df
-bs.dat <- rbind(bs.dat, tmp.dat)
-
-tmp.dat <- treated.2019.dat[,c('Longitude','Latitude','Yield','Sprayed')]
-df=12
-models.bs.lm[[2]] <- lm(Yield ~ Sprayed + bs(Longitude,df=df)*bs(Latitude,df=df), data=tmp.dat)
-tmp.dat$Yield <- predict(models.bs.lm[[2]])
-tmp.dat$DF = df
-bs.dat <- rbind(bs.dat, tmp.dat)
-
-tmp.dat <- treated.2019.dat[,c('Longitude','Latitude','Yield','Sprayed')]
-df=26
-models.bs.lm[[3]] <- lm(Yield ~ Sprayed + bs(Longitude,df=df)*bs(Latitude,df=df), data=tmp.dat)
-
-tmp.dat$Yield <- predict(models.bs.lm[[3]])
-tmp.dat$DF = df
-bs.dat <- rbind(bs.dat, tmp.dat)
-```
-
-Note the df
-
-```{r}
-coef(models.bs.lm[[1]])[1:2]
-coef(models.bs.lm[[2]])[1:2]
-coef(models.bs.lm[[3]])[1:2]
-#summary(models.bs.lm[[1]])
-anova(models.bs.lm[[1]])
-
-#summary(models.bs.lm[[2]])
-anova(models.bs.lm[[2]])
-anova(models.bs.lm[[3]])
-```
-
-
-```{r,fig.width=9,fig.height=6}
-ggplot(bs.dat, aes(Longitude,Latitude)) + 
-geom_point(aes(colour = Yield),size=1) + 
-scale_colour_gradient2(low=vermillion, mid=yellow, high=blue,midpoint = mean(bs.dat$Yield)) +
-#scale_colour_gradient(low=cbPalette[8], high=cbPalette[5]) +
-labs(colour = "Lm with b-spline", x="Easting", y="Northing") + facet_wrap(~ DF)
-```
-
-```{r,fig.width=6,fig.height=3}
-ggplot(bs.dat, aes(x=Yield)) + geom_histogram() + facet_wrap(~ DF)
-```
-
-## GAM
-
-```{r}
-
-models.gam <- vector(mode='list',3)
-gam.dat <- NULL
-
-tmp.dat <- treated.2019.dat[,c('Longitude','Latitude','Yield','Sprayed')]
-models.gam[[1]] <- gam(Yield ~ Sprayed + s(Longitude,Latitude,k=116),data=tmp.dat)
-tmp.dat$Yield <- predict(models.gam[[1]])
-tmp.dat$K = 116
-gam.dat <- rbind(gam.dat, tmp.dat)
-
-tmp.dat <- treated.2019.dat[,c('Longitude','Latitude','Yield','Sprayed')]
-models.gam[[2]] <- gam(Yield ~ Sprayed + s(Longitude,Latitude,k=65),data=tmp.dat)
-tmp.dat$Yield <- predict(models.gam[[2]])
-tmp.dat$K = 65
-gam.dat <- rbind(gam.dat, tmp.dat)
-
-tmp.dat <- treated.2019.dat[,c('Longitude','Latitude','Yield','Sprayed')]
-models.gam[[3]] <- gam(Yield ~ Sprayed + s(Longitude,Latitude,k=320),data=tmp.dat)
-tmp.dat$Yield <- predict(models.gam[[3]])
-tmp.dat$K = 320
-gam.dat <- rbind(gam.dat, tmp.dat)
-```
-
-```{r,fig.width=9,fig.height=6}
-ggplot(gam.dat, aes(Longitude,Latitude)) + 
-geom_point(aes(colour = Yield),size=1) + 
-scale_colour_gradient2(low=vermillion, mid=yellow, high=blue,midpoint = mean(gam.dat$Yield)) +
-#scale_colour_gradient(low=cbPalette[8], high=cbPalette[5]) +
-labs(colour = "GAM", x="Easting", y="Northing") + facet_wrap(~ K)
-```
-
-```{r,fig.width=6,fig.height=3}
-ggplot(gam.dat, aes(x=Yield)) + geom_histogram() + facet_wrap(~ K)
-```
-
-
-```{r}
-
-default.gam <- gam(Yield ~ Sprayed + s(Longitude,Latitude),data=treated.2019.dat)
-gam.check(default.gam)
-summary(default.gam)
-
-summary(models.gam[[1]])
-summary(models.gam[[2]])
-summary(models.gam[[3]])
-```
-
-```{r}
-null.gam <- gam(Yield ~ s(Longitude,Latitude,k=116),data=treated.2019.dat)
-gam.check(null.gam)
-
-anova(null.gam)
-anova(null.gam,models.gam[[1]])
-
-
-anova(models.gam[[1]])
-plot(models.gam[[1]])
-
-null.gam <- gam(Yield ~ s(Longitude,Latitude,k=320),data=treated.2019.dat)
-gam.check(null.gam)
-
-anova(null.gam)
-anova(null.gam,models.gam[[2]])
-
-
-anova(models.gam[[2]])
-plot(models.gam[[2]])
-```
-
-
-# TE
-
-```{r}
-#for some reason, this now gives a vector memory exhausted error
-models.te <- vector(mode='list',3)
-te.dat <- NULL
-
-tmp.dat <- treated.2019.dat[,c('Longitude','Latitude','Yield','Sprayed')]
-models.te[[1]] <- gam(Yield ~ Sprayed + te(Longitude,Latitude,k=11),data=tmp.dat)
-tmp.dat$Yield <- predict(models.te[[1]])
-tmp.dat$K = 11
-te.dat <- rbind(te.dat, tmp.dat)
-
-tmp.dat <- treated.2019.dat[,c('Longitude','Latitude','Yield','Sprayed')]
-models.te[[2]] <- gam(Yield ~ Sprayed + te(Longitude,Latitude,k=8),data=tmp.dat)
-tmp.dat$Yield <- predict(models.te[[2]])
-tmp.dat$K = 8
-te.dat <- rbind(te.dat, tmp.dat)
-
-summary(models.te[[1]])
-summary(models.te[[2]])
-```
-
-```{r,eval=FALSE}
-
-
-tmp.dat <- treated.2019.dat[,c('Longitude','Latitude','Yield','Sprayed')]
-models.te[[3]] <- gam(Yield ~ Sprayed + te(Longitude,Latitude,k=29),data=tmp.dat)
-tmp.dat$Yield <- predict(models.te[[3]])
-tmp.dat$K = 27
-te.dat <- rbind(te.dat, tmp.dat)
-
-
-```
-
-```{r,fig.width=9,fig.height=6,eval=FALSE}
-ggplot(te.dat, aes(Longitude,Latitude)) + 
-geom_point(aes(colour = Yield),size=1) + 
-scale_colour_gradient2(low=vermillion, mid=yellow, high=blue,midpoint = mean(te.dat$Yield)) +
-#scale_colour_gradient(low=cbPalette[8], high=cbPalette[5]) +
-labs(colour = "TP", x="Easting", y="Northing") + facet_wrap(~ K)
-
-ggplot(te.dat, aes(x=Yield)) + geom_histogram() + facet_wrap(~ K)
-```
-
-```{r,eval=FALSE}
-
-anova(models.te[[1]])
-plot(models.te[[1]])
-
-
-anova(models.te[[2]])
-plot(models.te[[2]])
-```
-
-# TP
-
-```{r,eval=FALSE}
-models.tp <- vector(mode='list',2)
-tp.dat <- NULL
-
-tmp.dat <- treated.2019.dat[,c('Longitude','Latitude','Yield','Sprayed')]
-models.tp[[1]] <- gam(Yield ~ Sprayed + te(Longitude,Latitude,bs=c("tp", "tp"),k=11),data=tmp.dat)
-tmp.dat$Yield <- predict(models.tp[[1]])
-tmp.dat$K = 11
-tp.dat <- rbind(tp.dat, tmp.dat)
-
-tmp.dat <- treated.2019.dat[,c('Longitude','Latitude','Yield','Sprayed')]
-models.tp[[2]] <- gam(Yield ~ Sprayed + te(Longitude,Latitude,bs=c("tp", "tp"),k=24),data=tmp.dat)
-tmp.dat$Yield <- predict(models.tp[[2]])
-tmp.dat$K = 24
-tp.dat <- rbind(tp.dat, tmp.dat)
-```
-
-```{r,fig.width=9,fig.height=6,eval=FALSE}
-ggplot(tp.dat, aes(Longitude,Latitude)) + 
-geom_point(aes(colour = Yield),size=1) + 
-scale_colour_gradient2(low=vermillion, mid=yellow, high=blue,midpoint = mean(tp.dat$Yield)) +
-#scale_colour_gradient(low=cbPalette[8], high=cbPalette[5]) +
-labs(colour = "TP", x="Easting", y="Northing") + facet_wrap(~ K)
-```
-
-```{r,fig.width=6,fig.height=3,eval=FALSE}
-ggplot(tp.dat, aes(x=Yield)) + geom_histogram() + facet_wrap(~ K)
-```
-
-```{r,eval=FALSE}
-summary(models.tp[[1]])
-anova(models.tp[[1]])
-#plot(models.tp[[1]])
-
-summary(models.tp[[2]])
-anova(models.tp[[2]])
-#plot(models.tp[[2]])
-
-anova(models.tp[[1]],models.tp[[2]])
-```
-
-```{r,eval=FALSE}
-install.packages("INLA",repos=c(getOption("repos"),INLA="https://inla.r-inla-download.org/R/testing"), dep=TRUE)
-inla.upgrade()
-inla.upgrade(testing=TRUE)
-#from git
-# R CMD INSTALL --build rinla
-```
-
-```{r,eval=FALSE}
-m <- 50
-points <- matrix(runif(m * 2), m, 2)
-
-mesh.2019 <- inla.mesh.2d(loc=treated.2019.dat[,c('Longitude','Latitude')],
-                           max.edge = c(0.05, 0.5))
-mesh <- inla.mesh.2d(loc = points, cutoff = 0.05, offset = c(0.1, 0.4),
-  max.edge = c(0.05, 0.5))
+Plot2 <- data.frame(Coef=Coef,Source=Source,K=K)
+ggplot(Plot2, aes(K,Coef)) + 
+    geom_point(aes(colour = Source),size=2) + 
+    geom_line(aes(colour = Source),size=1) + 
+    scale_colour_manual(values=cbPalette) + #facet_wrap(~Criteria,nrow=3,scales="free_y") +
+    labs(title="Coefficients, Example 2", x ="Smoothing Parameter", y = "Spray Effect Estimate") + facet_wrap(~Source, scales="free_x")
 ```
 
 # MCMC/Bayesian Methods
 
 ## Stan models
 
-```{r}
+```{r,eval=FALSE}
 library(brms)
 if(!file.exists('Stan.Rda')) {
   fit.brms <- brm(Yield ~ Sprayed + s(Longitude,Latitude),data=treated.2019.dat)
@@ -726,7 +895,6 @@ summary(brms320)
 #plot(brms320)
 ```
 
-spatialfusion
 ```{r,eval=FALSE}
 library(spatialfusion)
 ## example based on simulated data
@@ -742,25 +910,6 @@ prior.phi = list(distr = "normal", pars = c(1, 10))) summary(mod_stan)
 ```
 
 piepho-11-2011
+souza-2016
 
 
-From https://www.supergeotek.com/Spatial_Statistical_ENG_HTML/spherical_mode.htm
-```{r}
-n=5
-r=80
-d=(1:100)/100
-sph <- function(C0,C,h,a) {
-  if(h==0) {
-    return(0)
-  } else if (h > a) {
-    return(C0+C)
-  } else {
-    return(C0 + C*((3/2)*(h/a) - (1/2)*(h/a)^3))
-  }
-}
-y = d
-for(i in 1:length(d)) {
-  y[i]=sph(1,1,d[i],0.5)
-}
- plot(d,y,ylim=c(0,2),type='l',ylab='Semivariance',xlab='Distance',main="Idealized Spherical Semivariogram")
-```

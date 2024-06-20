@@ -19,29 +19,30 @@ vermillion <- "#D55E00"
 cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#F0E442","#CC79A7","#000000","#734f80", "#2b5a74", "#004f39", "#787221", "#003959", "#6aaf00", "#663cd3")
 ```
 
-```{r}
-treated.2019.dat <- read.csv(file='../ManagementZoneML/data/B 2019 Soybeans Treated.csv')
+```{r,include=FALSE}
+treated.2019.dat <- read.csv(file='../ManagementZoneML/data/B 2019 Soybean Treated.csv')
 #left = 1480 #trim more than the untrimmed
 left = 1550 #trim more than the untrimmed
 treated.2019.dat <- treated.2019.dat[treated.2019.dat$Longitude >left,]
 
 treated.2019.dat <- treated.2019.dat[treated.2019.dat$Latitude < 1180,]
 treated.2019.dat <- treated.2019.dat[treated.2019.dat$Latitude > 1000,]
+#treated.2019.dat <- treated.2019.dat[treated.2019.dat$Rectangle==1,]
 ```
 
 
-```{r}
+```{r,include=FALSE}
 treated.2019.dat$Pass <- treated.2019.dat$Block
 treated.2019.dat$Block <- as.factor(ceiling(treated.2019.dat$Pass/2))
 treated.2019.dat$Sprayed <- treated.2019.dat$Pass %in% c(2,4,6,8)
 ```
 
-```{r}
+```{r,include=FALSE}
 ggplot(treated.2019.dat, aes(x=Longitude, y=Latitude, fill=Yield)) + geom_tile(aes(fill = Yield)) + scale_fill_continuous(type = "viridis")
 ```
   
   
-```{r}
+```{r,include=FALSE}
 treated.2019.dat$SprayedRank <- rank(treated.2019.dat$Sprayed)
 treated.2019.dat$SprayedRank <- treated.2019.dat$SprayedRank/max(treated.2019.dat$SprayedRank)
 
@@ -62,7 +63,7 @@ scale_colour_gradient2(low=vermillion, mid=yellow, high=blue, midpoint = 0.5) +
 labs(colour = "Relative Rank", x="Easting", y="Northing", title = "Strip Trial") + facet_wrap(~ Map)
 ```
 
-```{r}
+```{r,include=FALSE}
 ggplot(treated.2019.dat, aes(x=Yield)) + geom_histogram()
 ggplot(treated.2019.dat, aes(sample = Yield)) + stat_qq() + stat_qq_line()
 treated.2019.dat <- treated.2019.dat[treated.2019.dat$Yield<80,]
@@ -72,7 +73,7 @@ ggplot(treated.2019.dat, aes(x=Yield)) + geom_histogram()
 ggplot(treated.2019.dat, aes(sample = Yield)) + stat_qq() + stat_qq_line()
 ```
 
-```{r}
+```{r,include=FALSE}
 MapsSprayed <- data.frame(Longitude=c(treated.2019.dat$Longitude,
                                 treated.2019.dat$Longitude),
                    Latitude=c(treated.2019.dat$Latitude,
@@ -90,7 +91,7 @@ labs(colour = "Relative Rank", x="Easting", y="Northing", title = "Strip Trial")
 # Deterministic models
 
 ## Natural splines
-```{r}
+```{r,include=FALSE}
 models=12
 models.ns.lm <- vector(mode='list',length=models)
 ns.dat <- NULL

@@ -33,21 +33,19 @@ source('./R/read.yield.data.R')
 source('./R/combined.map.R')
 ```
 
-
 Elbow plot/Elbow method
 
-
 ## Load Data
-
 
 ```{r,eval=TRUE,echo=FALSE}
 field = 'G'
 root = '../ManagementZoneML/data/'
 
-Years <- c(2013,2014,2015,2016,2017,2018,2020,2021)
-Crops <- c('Corn','Soybeans','Corn','Soybeans','Corn','Soybeans','Corn','Soybeans')
-#Years <- c(2013,2015,2016,2017,2018,2020,2021)
-#Crops <- c('Corn','Corn','Soybeans','Corn','Soybeans','Corn','Soybeans')
+#2014 is incomplete data
+#Years <- c(2013,2014,2015,2016,2017,2018,2020,2021)
+#Crops <- c('Corn','Soybeans','Corn','Soybeans','Corn','Soybeans','Corn','Soybeans')
+Years <- c(2013,2015,2016,2017,2018,2020,2021)
+Crops <- c('Corn','Corn','Soybeans','Corn','Soybeans','Corn','Soybeans')
 
 #R aborts during 2016
 #Years <- c(2013,2015,2017,2018,2020)
@@ -59,15 +57,13 @@ for(i in 1:length(Years)) {
 }
 ```
 
-
 ```{r,fig.width=8,fig.height=4.5,echo=FALSE}
 Maps6 <- combined.map(harvests)
-ggplot(Maps6, aes(Longitude,Latitude)) + 
+ggplot(Maps6, aes(Easting,Northing)) + 
 geom_point(aes(colour = Quantile),size=.5) + 
 scale_colour_gradient2(low=vermillion, mid=yellow, high=blue, midpoint = 0.5) +
 labs(colour = "Relative Yield Rank", x="Easting", y="Northing", title = "Multiple Years") + facet_wrap(~ Map)
 ```
-
 
 # Model Selection
 
@@ -93,24 +89,24 @@ Methods = vector(mode='list',length=length(methods))
 
 ```{r, echo=FALSE,fig.width=6,fig.height=4}
 for(j in 1:length(methods)) {
-  prof.name = paste('profile',methods[j],sep='')
-  Rprof(prof.name)
+  #prof.name = paste('profile',methods[j],sep='')
+  #Rprof(prof.name)
   Models <- vector(mode='list',length=length(Years))
   Plots <- vector(mode='list',length=length(Years))
 
   for(i in 1:length(Years)) {
-     print(paste("Year = ",Years[i]))
+    #print(paste("Year = ",Years[i]))
     Models[[i]] <- spatial.model.selection(harvests[[i]],
                                            range=ranges[j,],
                                            method=methods[j],
                                            models=models,
                                            moments=FALSE)
-    print(paste("Plot = ",Years[i]))
+    #print(paste("Plot = ",Years[i]))
     Plots[[i]] <- spatial.selection.plots(Models[[i]])
     #print(summary(lm(Gamma ~ 0 + K + K:Distance,data=Models[[i]]$ResidualsData)))
-    print(Plots[[i]])
+    #print(Plots[[i]])
   }
-  
+print(methods[j])
   SelectionG <- NULL
   BestBICG <- NULL
   BestSlopeG <- NULL
@@ -119,21 +115,23 @@ for(j in 1:length(methods)) {
   for(i in 1:length(Years)) {
     tmp <- Models[[i]]$Selection
     tmp$Year <- Years[i]
-    SelectionG <- rbind(SelectionG,tmp)
+    SelectionG <- rbind(SelectionG,tmp$Data)
   
     tmp <- select.best.variogram(Models[[i]])
-    tmp$Year <- Years[i]
-    BestBICG <- rbind(BestBICG,tmp)
+    tmp$Data$Year <- Years[i]
+    BestBICG <- rbind(BestBICG,tmp$Data)
+print(paste("Best BIC, K=",tmp$K))
 
     tmp <- select.best.variogram(Models[[i]],criteria='slope')
-    tmp$Year <- Years[i]
-    BestSlopeG <- rbind(BestSlopeG,tmp)
-    
+    tmp$Data$Year <- Years[i]
+    BestSlopeG <- rbind(BestSlopeG,tmp$Data)
+print(paste("Best Slope, K=",tmp$K))
     tmp <- select.best.variogram(Models[[i]],criteria='nugget')
-    tmp$Year <- Years[i]
-    BestNuggetG <- rbind(BestNuggetG,tmp)
+    tmp$Data$Year <- Years[i]
+    BestNuggetG <- rbind(BestNuggetG,tmp$Data)
+print(paste("Best Nugget, K=",tmp$K))
   }
-  Rprof(NULL)
+  #Rprof(NULL)
   
   Methods[[j]] <- list(Models=Models,
                        Plots=Plots,
@@ -228,7 +226,6 @@ ggplot(pooled[pooled$Criteria=='Nugget' & pooled$Source=='Residuals',], aes(Dist
 
 \pagebreak
 
-
 ```{r,echo=FALSE,fig.width=8,fig.height=4}
 ggplot(pooled[pooled$Criteria=='BIC' & pooled$Source=='Model',], aes(Distance,Gamma)) + 
     geom_point(aes(colour = Method),size=2) + 
@@ -266,6 +263,7 @@ ggplot(pooled[pooled$Criteria=='Nugget' & pooled$Source=='Residuals',], aes(Dist
 # Model Selection Averages
 
 ## Average Residuals SemiCorrelations
+
 ```{r}
 ResidualsTable <- aggregate(Gamma ~ Method,data=SummaryBIC[SummaryBIC$Source=='Residuals',], mean)
 names(ResidualsTable)[2] <- 'BIC'
@@ -316,7 +314,7 @@ geom_point(aes(colour = Year),size=.2) +
 aggregate(Distance ~ Year,Distance.dat,FUN=sd)
 ```
 
-```{r}
+```{r,eval=FALSE}
 for(j in 1:length(methods)) {
   prof.name = paste('profile',methods[j],sep='')
   print(paste("Profile for",methods[j]))

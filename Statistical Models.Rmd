@@ -3,8 +3,8 @@ title: "Statistical Models"
 author: "Peter Claussen"
 date: "7/2/2020"
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
 bibliography: biblio.bib
 ---
 

@@ -1,0 +1,847 @@
+
+
+<<fig=TRUE,width=6,height=4>>=
+adj.trimmedrot.var <- variogram(YldVolDry~1, 
+                          locations=~LonAdj+LatOff, 
+                          alpha=c(0,90,180,270), 
+                          data=adj.trimmed.dat)
+plot(adj.trimmedrot.var)
+@
+
+
+
+
+
+deltaLat <- max(pass32.dat$Latitude)-min(pass32.dat$Latitude)
+plot(Latitude~Longitude,data=pass32.dat,xlim=c(min(pass32.dat$Longitude),min(pass32.dat$Longitude)+deltaLat))
+abline(lm(Latitude ~ Longitude,data=pass32.dat))
+ggplot(pass32.dat, aes(Longitude, Latitude)) + geom_point(aes(colour = YldVolDry),size = 2)
+
+lm(Latitude ~ Longitude,data=pass32.dat)
+lm(LatOff ~ LonAdj,data=pass32.dat)
+
+
+degrees <- atan(slope)*180/pi
+-1.722356
+degrees <- atan(-1.722356)*180/pi
+atan(-58.06)*(180/pi)
+1/-58.06
+-0.01722356
+atan(-1.722356)*180/pi
+
+
+
+<<>>=
+plot(CropFlw~ID,data=sample.dropped.dat)
+plot(CropFlw~Speed,data=sample.dropped.dat)
+sample.dropped.dat$EstSpeed <- 
+
+plot(YldMassWet ~ CropFlw,data=sample.dropped.dat)
+plot(Distance ~ Speed,data=sample.dropped.dat)
+
+points <- dim(sample.dropped.dat)[1]
+sample.dropped.dat$DeltaLon <- 0
+sample.dropped.dat$DeltaLon[2:points] <- sample.dropped.dat$Longitude[2:points] - sample.dropped.dat$Longitude[1:points-1]
+sample.dropped.dat$DeltaLat <- 0
+sample.dropped.dat$DeltaLat[2:points] <- sample.dropped.dat$Latitude[2:points] - sample.dropped.dat$Latitude[1:points-1]
+sample.dropped.dat$GPSDistance <- sqrt(sample.dropped.dat$DeltaLon^2 + sample.dropped.dat$DeltaLat^2)
+
+plot(Distance ~ GPSDistance,data=sample.dropped.dat)
+plot(Speed ~ GPSDistance,data=sample.dropped.dat)
+
+sample.dropped.dat$CalcYield <- sample.dropped.dat$CropFlw / (sample.dropped.dat$Distance)
+@
+
+
+
+
+<<>>=
+corn.dat$ImpPass <- 0
+impPass <- 1
+i=1
+corn.dat$ImpPass[i] <- impPass
+corn.dat$DirLon <- NA
+corn.dat$DirLat <- NA
+while(i<length(corn.dat$ImpPass)) {
+   delta.Lon <- corn.dat$Longitude[i]-corn.dat$Longitude[i+1]
+   delta.Lat <- corn.dat$Latitude[i]-corn.dat$Latitude[i+1]
+   if(delta.Lon > 0 ) {
+      #moving west
+      corn.dat$DirLon[i+1] <- "W"
+   } else {
+      corn.dat$DirLon[i+1] <- "E"
+   }
+   
+   if(delta.Lat > 0 ) {
+      #moving west
+      corn.dat$DirLat[i+1] <- "S"
+   } else {
+      corn.dat$DirLat[i+1] <- "N"
+   }
+   
+   delta.Lon <- abs(delta.Lon)
+   delta.Lat <- abs(delta.Lat)
+   if(delta.Lon > 0.9*pass.width) {
+      #if(corn.dat$DirLat[i]!=corn.dat$DirLat[i+1]) {
+         impPass = impPass+1
+      #}
+   }
+   corn.dat$ImpPass[i+1] <- impPass
+   i <- i+1
+}
+
+corn.dat$DirLon <- as.factor(corn.dat$DirLon)
+corn.dat$DirLat <- as.factor(corn.dat$DirLat)
+@
+
+<<>>=
+hist(corn.dat$ImpPass)
+corn.dat$ImpPass <- as.factor(corn.dat$ImpPass)
+count.passes <- tapply(corn.dat$PassNum, list(corn.dat$PassNum),length)
+count.pasimp <- tapply(corn.dat$ImpPass, list(corn.dat$ImpPass),length)
+problem.passes <- names(count.passes[(which(count.passes<400 | count.passes>550))])
+problem.imp <- names(count.pasimp[(which(count.pasimp<400 | count.pasimp>550))])
+count.pasimp[(which(count.pasimp<400 | count.pasimp>550))]
+problem.dat <- subset(corn.dat,corn.dat$ImpPass %in% problem.imp)
+problem.dat$ImpPass <- as.factor(as.numeric(problem.dat$ImpPass))
+@
+
+<<fig=TRUE>>=
+ ggplot(breaks.dat, aes(Longitude, Latitude)) + geom_point(aes(color=DirLat),size = 2)
+@
+
+<<fig=TRUE>>=
+breaks.dat <- subset(breaks.dat,breaks.dat$Longitude < -96.8995)
+breaks.dat$PassNum <- as.factor(as.numeric(breaks.dat$PassNum))
+ggplot(breaks.dat, aes(Longitude, Latitude)) + geom_point(aes(color=PassNum),size = 2)
+@
+
+
+
+
+
+
+
+
+
+
+
+
+
+Consider the sample subset. We take the differences among the averages
+
+<<>>=
+sample.dat$Pass <- as.factor(as.numeric(sample.dat$Pass))
+sample.longs <- tapply(sample.dat$Longitude,list(sample.dat$Pass),mean)
+
+pass.width <- mean(sample.longs[1:(length(sample.longs)-1)]-sample.longs[2:length(sample.longs)])
+@
+
+
+
+
+
+
+\section*{Time correlation}
+
+<<fig=TRUE>>=
+one.dat <- subset(adj.trimmed.dat,adj.trimmed.dat$PassNum==32)
+ggplot(one.dat, aes(Longitude, Latitude)) + geom_point(aes(colour = YldVolDry),size = 2)
+ggplot(one.dat, aes(Longitude, Latitude)) + geom_point(aes(colour = YldVolDry),size = 2)
+@
+
+
+<<fig=TRUE>>=
+arima.dat <- data.frame(
+   ID = c(one.dat$ID,one.dat$ID),
+   Latitude = c(one.dat$Latitude,one.dat$Latitude),
+   Yield = c(one.dat$YldVolDry,one.dat$YldVolDryA),
+   Estimate = c(rep("Raw",length(one.dat$YldVolDry)),rep("ARIMA",length(one.dat$YldVolDryA)))
+   )
+arima.dat$Estimate <- as.factor(arima.dat$Estimate)
+ggplot(arima.dat, aes(Latitude, Yield)) + geom_point(aes(colour = Estimate),size = 1) + geom_smooth(aes(group = Estimate),method="loess")
+@
+
+<<fig=TRUE>>=
+one.dat <- subset(corn.dat,corn.dat$PassNum==30)
+arima.dat <- data.frame(
+   ID = c(one.dat$ID,one.dat$ID),
+   Latitude = c(one.dat$Latitude,one.dat$Latitude),
+   Yield = c(one.dat$YldVolDry,one.dat$YldVolDryA),
+   Estimate = c(rep("Raw",length(one.dat$YldVolDry)),rep("ARIMA",length(one.dat$YldVolDryA)))
+   )
+arima.dat$Estimate <- as.factor(arima.dat$Estimate)
+ggplot(arima.dat, aes(Latitude, Yield)) + geom_point(aes(colour = Estimate),size = 1) + geom_smooth(aes(group = Estimate),method="loess")
+@
+
+<<fig=TRUE>>=
+one.dat <- subset(corn.dat,corn.dat$PassNum==33)
+arima.dat <- data.frame(
+   ID = c(one.dat$ID,one.dat$ID),
+   Latitude = c(one.dat$Latitude,one.dat$Latitude),
+   Yield = c(one.dat$YldVolDry,one.dat$YldVolDryA),
+   Estimate = c(rep("Raw",length(one.dat$YldVolDry)),rep("ARIMA",length(one.dat$YldVolDryA)))
+   )
+arima.dat$Estimate <- as.factor(arima.dat$Estimate)
+ggplot(arima.dat, aes(Latitude, Yield)) + geom_point(aes(colour = Estimate),size = 1) + geom_smooth(aes(group = Estimate),method="loess")
+@
+
+<<fig=TRUE>>=
+one.dat <- subset(corn.dat,corn.dat$PassNum==31)
+arima.dat <- data.frame(
+   ID = c(one.dat$ID,one.dat$ID),
+   Latitude = c(one.dat$Latitude,one.dat$Latitude),
+   Yield = c(one.dat$YldVolDry,one.dat$YldVolDryA),
+   Estimate = c(rep("Raw",length(one.dat$YldVolDry)),rep("ARIMA",length(one.dat$YldVolDryA)))
+   )
+arima.dat$Estimate <- as.factor(arima.dat$Estimate)
+ggplot(arima.dat, aes(Latitude, Yield)) + geom_point(aes(colour = Estimate),size = 1) + geom_smooth(aes(group = Estimate),method="loess")
+@
+
+Original
+
+\subsection{Sample Kriging, ARIMA smoothed}
+Simple autocorrelation
+<<fig=TRUE>>=
+raw.acf <- acf(raw.dat$YldVolDry)
+@
+
+<<fig=TRUE>>=
+raw.pacf <- pacf(raw.dat$YldVolD)
+@
+
+<<fig=TRUE>>=
+library(forecast)
+raw.arima <- auto.arima(raw.dat$YldVolDry)
+raw.arima
+tsdiag(raw.arima)
+@
+
+It looks like there is a signficant autocorrelative process occurring over time, and this may have a frequency of about 4 points.
+<<>>=
+raw.dat$YldVolDryA <- raw.dat$YldVolDry - raw.arima$residuals
+@
+
+<<fig=TRUE>>=
+tapply(raw.dat$PassNum,list(raw.dat$PassNum),length)
+one.dat <- subset(raw.dat,raw.dat$PassNum==32)
+
+ggplot(one.dat, aes(Longitude, Latitude)) + geom_point(aes(colour = YldVolDry),size = 2)
+@
+
+
+
+
+plot(dropped.dat$YldVolDry, dropped1.krig$YldVolDry.pred)
+points(dropped.dat$YldVolDry, dropped.krig$YldVolDry.pred,col="red")
+<<fig=TRUE>>=
+corn.var <- variogram(corn.dat$YldVolDry~1, locations=~Longitude+Latitude, data=corn.dat)
+plot(corn.var)
+@
+
+<<>>=
+corn.vgm <- fit.variogram(corn.var, vgm(800,"Exp",0.002,500))
+@
+
+<<>>=
+grd <- expand.grid(Longitude=seq(from=min.lon, to=max.lon, by=lon.rng/50),
+  Latitude=seq(from=min.lat, to=max.lat, by=lat.rng/50))
+@
+
+This is the slow step
+<<>>=
+corn.krig <- NA
+if(!file.exists("corn.krig.Rda")) {
+   corn.krig <- krige(id="YldVolDry", formula=YldVolDry~1, data=corn.dat, newdata=grd, model = corn.vgm,
+     locations=~Longitude+Latitude)
+   save(corn.krig,file="corn.krig.Rda")
+} else {
+   load("corn.krig.Rda")
+}
+
+@
+
+<<fig=TRUE>>=
+ggplot(corn.krig, aes(Longitude, Latitude)) + geom_point(aes(colour = YldVolDry.pred),size = 2,shape=15)
+@
+
+\section*{Minimum distances}
+\section*{Passes Required}
+How many neighbor passes do we need to include in the kriging data set? Consider that we may be interested in designing an experiment to compare treatments - perhaps methods for determining sight-specific recommendations. How much space should be provide between passes?
+
+\subsection*{Sample data set}
+<<>>=
+
+ss <- 1:6
+diffs <- c()
+range <- c()
+latitude <- c()
+predicted <- c()
+actual <- c()
+drop1_1.dat <- NA
+plots <- vector("list", length(ss))
+for(i in 1:length(ss)) {
+   drop1_1.dat <- subset(drop1.dat,drop1.dat$Order %in% ((drop.Order-i):(drop.Order+i)))
+   #ggplot(drop1_1.dat, aes(Longitude, Latitude)) + geom_point(aes(colour = YldVolDry),size = 2)
+   dropped1.var <- variogram(drop1_1.dat$YldVolDry~1, 
+      locations=~Longitude+Latitude, data=drop1_1.dat)
+   dropped1.vgm <- fit.variogram(dropped1.var, vgm(800,"Exp",0.0004,500))
+   dropped1.krig <- krige(id="YldVolDry", formula=YldVolDry~1, 
+      data=drop1_1.dat, newdata=dropped.dat, model = dropped1.vgm,
+     locations=~Longitude+Latitude)
+   dropped.diffs <- dropped.dat$YldVolDry-dropped1.krig$YldVolDry.pred
+     pred1.ss <- sum((dropped.diffs)^2)
+   ss[i]<- pred1.ss
+   predicted <- c(predicted,dropped1.krig$YldVolDry.pred)
+   actual <- c(actual,dropped.dat$YldVolDry)
+   diffs <-  c(diffs,dropped.diffs)
+   range <- c(range, rep(i,length(dropped.diffs)))
+   latitude <- c(latitude,dropped.dat$Latitude)
+   current.plot <- ggplot(drop1_1.dat, aes(Longitude, Latitude)) + geom_point(aes(colour = YldVolDry),size = 2)
+   plots[[i]] <- current.plot
+}
+ss
+mean.dropped <- mean(dropped.dat$YldVolDry)
+total.ss <-  sum((sample.dat$YldVolDry-mean.dropped)^2)
+dropped.ss <-  sum((dropped.dat$YldVolDry-mean.dropped)^2)
+total.ss
+dropped.ss
+n <- length(dropped.dat$YldVolDry)
+dropped.ss/(n-1)
+total.ss/(n-1)
+ss/(n-1)
+sqrt(ss/(n-1))
+dropped.ss/(n-1)
+@
+
+<<>>=
+mean.dropped <- mean(sample.dropped.dat$YldVolDry)
+total.ss <-  sum((sample.dropped.dat$YldVolDry-mean.dropped)^2)
+total.ss
+error.ss <- sum((sample.dropped.dat$YldVolDry-sample.dropped.krig$YldVolDry.pred)^2)
+error.ss
+model.ss <- sum((sample.dropped.krig$YldVolDry.pred-mean.dropped)^2)
+model.ss
+n <- length(sample.dropped.dat$YldVolDry)
+error.ss/(n-1)
+model.ss/(n-1)
+@
+
+
+\subsection*{Full data set}
+<<>>=
+corn.dat$Pass <- as.factor(corn.dat$PassNum)
+pass.long <- tapply(corn.dat$Longitude,list(corn.dat$Pass),mean)
+corn.dat$Order <- rank(pass.long)[corn.dat$Pass]
+#corn.dat$Pass <- as.factor(corn.dat$ImpPass)
+#pass.long <- tapply(corn.dat$Longitude,list(corn.dat$ImpPass),mean)
+#corn.dat$Order <- rank(pass.long)[corn.dat$ImpPass]
+
+corn.dat$PassOrder <- as.factor(corn.dat$Order)
+
+min.Order <- min(corn.dat$Order,na.rm=TRUE)
+max.Order <- max(corn.dat$Order,na.rm=TRUE)
+
+drop.Order <- floor(min.Order + (max.Order-min.Order)/2)
+drop1.dat <- subset(corn.dat,corn.dat$Order!=drop.Order)
+dropped.dat <- subset(corn.dat,corn.dat$Order==drop.Order)
+@
+
+<<fig=TRUE>>=
+ ggplot(dropped.dat, aes(Longitude, Latitude)) + geom_point(aes(colour = YldVolDry),size = 2)
+@
+
+<<>>=
+ss <- 1:9
+diffs <- c()
+range <- c()
+latitude <- c()
+predicted <- c()
+actual <- c()
+drop1_1.dat <- NA
+plots <- vector("list", length(ss))
+for(i in 1:length(ss)) {
+   drop1_1.dat <- subset(drop1.dat,drop1.dat$Order %in% ((drop.Order-i):(drop.Order+i)))
+   #ggplot(drop1_1.dat, aes(Longitude, Latitude)) + geom_point(aes(colour = YldVolDry),size = 2)
+   dropped1.var <- variogram(drop1_1.dat$YldVolDry~1, 
+      locations=~Longitude+Latitude, data=drop1_1.dat)
+   dropped1.vgm <- fit.variogram(dropped1.var, vgm(800,"Exp",0.0004,500))
+   dropped1.krig <- krige(id="YldVolDry", formula=YldVolDry~1, 
+      data=drop1_1.dat, newdata=dropped.dat, model = dropped1.vgm,
+     locations=~Longitude+Latitude)
+   dropped.diffs <- dropped.dat$YldVolDry-dropped1.krig$YldVolDry.pred
+     pred1.ss <- sum((dropped.diffs)^2)
+   ss[i]<- pred1.ss
+   predicted <- c(predicted,dropped1.krig$YldVolDry.pred)
+   actual <- c(actual,dropped.dat$YldVolDry)
+   diffs <-  c(diffs,dropped.diffs)
+   range <- c(range, rep(i,length(dropped.diffs)))
+   latitude <- c(latitude,dropped.dat$Latitude)
+   current.plot <- ggplot(drop1_1.dat, aes(Longitude, Latitude)) + geom_point(aes(colour = YldVolDry),size = 2)
+   plots[[i]] <- current.plot
+}
+ss
+mean.dropped <- mean(dropped.dat$YldVolDry)
+total.ss <-  sum((corn.dat$YldVolDry-mean.dropped)^2)
+dropped.ss <-  sum((dropped.dat$YldVolDry-mean.dropped)^2)
+total.ss
+dropped.ss
+n <- length(dropped.dat$YldVolDry)
+dropped.ss/(n-1)
+total.ss/(n-1)
+ss/(n-1)
+sqrt(ss/(n-1))
+dropped.ss/(n-1)
+@
+
+
+<<fig=TRUE>>=
+print(plots[[1]])
+@
+
+<<fig=TRUE>>=
+print(plots[[5]])
+@
+
+<<fig=TRUE>>=
+print(plots[[9]])
+@
+
+#par(mfrow=c(1,1))
+#ggplot(drop1_1.dat, aes(Longitude, Latitude)) + geom_point(aes(colour = Order),size = 2)
+
+
+
+
+\section*{Interpolating Spatial Coordinates}
+
+
+
+
+<<>>=
+corn.dat <- subset(raw.dat,raw.dat$Latitude>=southBorder)
+corn.dat <- subset(corn.dat,corn.dat$Latitude<=northBorder)
+@
+
+delta.Lon <- abs(corn.dat$Longitude[i]-corn.dat$Longitude[i+1])
+delta.Lat <- abs(corn.dat$Latitude[i]-corn.dat$Latitude[i+1])
+
+<<>>=
+plot.dat <- data.frame(diffs,
+   range,
+   latitude,
+   predicted,
+   actual
+)
+plot.dat$range <- as.factor(plot.dat$range)
+@
+
+<<fig=TRUE>>=
+ggplot(plot.dat, aes(latitude,diffs)) + geom_point(aes(colour = range),size = 1)
+@
+
+<<fig=TRUE>>=
+ggplot(plot.dat, aes(actual,predicted)) + geom_point(aes(colour = range,size=range),size = 1) + geom_smooth(aes(group=range,color=range),se=FALSE,method="lm")
+@
+
+
+What about vertical displacement?
+
+<<>>=
+problem.passes <- c()
+corn.dat$LongPred <- NA
+for(pass in levels(corn.dat$Pass)) {
+   pass.dat <- subset(corn.dat,corn.dat$Pass == pass)
+   if(length(pass.dat$Longitude)>0) {
+      pass.lm <- lm(Longitude ~ Latitude,data=pass.dat)
+      if(abs(pass.lm$coefficients[2])<0.04) {
+         corn.dat$LongPred[corn.dat$Pass == pass] <- predict(pass.lm,pass.dat)
+      } else {
+         problem.passes <- c(problem.passes,pass)
+         print(pass.lm$coefficients)
+         corn.dat$LongPred[corn.dat$Pass == pass] <- corn.dat$Longitude[corn.dat$Pass == pass]
+      }
+   } else {
+      problem.passes <- c(problem.passes,pass)
+   }
+}
+@
+
+
+
+<<fig=TRUE>>=
+corn.dat$ProblemPass <- corn.dat$Pass %in% problem.passes
+ggplot(corn.dat, aes(Longitude, Latitude)) + geom_point(aes(colour = ProblemPass),size = 2)
+@
+
+
+<<fig=TRUE>>=
+corn.dat$Sub <- corn.dat$Latitude>(min.lat + 2*(lat.rng/5)) & 
+                 corn.dat$Latitude<(max.lat - 2*(lat.rng/5)) &
+                 corn.dat$Longitude>(min.lon + 2*(lon.rng/5)) &
+                 corn.dat$Longitude<(max.lon - 2*(lon.rng/5))
+sample.dat <- subset(corn.dat,corn.dat$Sub)
+sample.dat <- subset(corn.dat,corn.dat$Sub)
+ggplot(sample.dat, aes(Longitude, Latitude)) + geom_point(aes(colour = YldVolDry),size = 2)
+@
+
+<<fig=TRUE>>=
+ggplot(corn.dat, aes(Longitude, Latitude)) + geom_point(aes(colour = YldVolDry),size = 2)
+@
+
+<<>>=
+corn.var2 <- variogram(corn.dat$YldVolDry~1, locations=~Longitude+Latitude, data=corn.dat)
+plot(corn.var2)
+corn.vgm2 <- fit.variogram(corn.var2, vgm(800,"Exp",0.002,500))
+@
+
+\section*{Vertical Displacement}
+Consider the problem of horizontal displacement.
+
+\subsection*{Field Ends}
+
+
+
+\subsection*{Offset Sample Kriging}
+
+
+
+<<>>=
+corn.dat <- subset(reduced.dat,reduced.dat$LatOff>=southBorder)
+corn.dat <- subset(corn.dat,corn.dat$LatOff<=northBorder)
+#ggplot(corn.dat, aes(Longitude, Latitude)) + geom_point(aes(colour = PassNum),size = 1)
+min.lat <- min(corn.dat$LatOff)
+max.lat <- max(corn.dat$LatOff)
+min.lon <- min(corn.dat$Longitude)
+max.lon <- max(corn.dat$Longitude)
+lat.rng <- max.lat-min.lat
+lon.rng <- max.lon-min.lon
+
+#sample.dat <- subset(corn.dat,corn.dat$Latitude>(min.lat + 2*(lat.rng/5)))
+#sample.dat <- subset(sample.dat,sample.dat$Latitude<(max.lat - 2*(lat.rng/5)))
+#sample.dat <- subset(sample.dat,sample.dat$Longitude>(min.lon + 2*(lon.rng/5)))
+#sample.dat <- subset(sample.dat,sample.dat$Longitude<(max.lon - 2*(lon.rng/5)))
+
+corn.dat$Sub <- corn.dat$LatOff>(min.lat + 2*(lat.rng/5)) & 
+                 corn.dat$LatOff<(max.lat - 2*(lat.rng/5)) &
+                 corn.dat$Longitude>(min.lon + 2*(lon.rng/5)) &
+                 corn.dat$Longitude<(max.lon - 2*(lon.rng/5))
+sample.dat <- subset(corn.dat,corn.dat$Sub)
+
+sample.dat$Pass <- as.factor(sample.dat$PassNum)
+pass.long <- tapply(sample.dat$Longitude,list(sample.dat$Pass),mean)
+sample.dat$Order <- rank(pass.long)[sample.dat$Pass]
+sample.dat$PassOrder <- as.factor(sample.dat$Order)
+
+ggplot(sample.dat, aes(Longitude, LatOff)) + geom_point(aes(colour = Pass),size = 2)
+
+ggplot(sample.dat, aes(Longitude, LatOff)) + geom_point(aes(colour = PassOrder),size = 2)
+
+sample.var <- variogram(sample.dat$YldVolDry~1, locations=~Longitude+LatOff, data=sample.dat)
+plot(sample.var)
+
+
+sample.vgm <- fit.variogram(sample.var, vgm(800,"Exp",0.0004,500))
+grd <- expand.grid(Longitude=seq(from=smin.lon, to=smax.lon, by=slon.rng/50),
+  LatOff=seq(from=smin.lat, to=smax.lat, by=slat.rng/50))
+  
+sample.krig <- krige(id="YldVolDry", formula=YldVolDry~1, data=sample.dat, newdata=grd, model = sample.vgm,
+  locations=~Longitude+LatOff)
+  
+  
+min.Order <- min(sample.dat$Order)
+max.Order <- max(sample.dat$Order)
+
+
+
+
+
+sample.dat$Pass <- as.factor(sample.dat$PassNum)
+pass.long <- tapply(sample.dat$Longitude,list(sample.dat$Pass),mean)
+sample.dat$Order <- rank(pass.long)[sample.dat$Pass]
+#corn.dat$Pass <- as.factor(corn.dat$ImpPass)
+#pass.long <- tapply(corn.dat$Longitude,list(corn.dat$ImpPass),mean)
+#corn.dat$Order <- Order(pass.long)[corn.dat$ImpPass]
+
+sample.dat$PassOrder <- as.factor(sample.dat$Order)
+
+min.Order <- min(sample.dat$Order,na.rm=TRUE)
+max.Order <- max(sample.dat$Order,na.rm=TRUE)
+
+drop.Order <- floor(min.Order + (max.Order-min.Order)/2)
+drop1.dat <- subset(sample.dat,sample.dat$Order!=drop.Order)
+dropped.dat <- subset(sample.dat,sample.dat$Order==drop.Order)
+ss <- 1:9
+diffs <- c()
+range <- c()
+latitude <- c()
+predicted <- c()
+actual <- c()
+drop1_1.dat <- NA
+plots <- vector("list", length(ss))
+for(i in 1:length(ss)) {
+   drop1_1.dat <- subset(drop1.dat,drop1.dat$Order %in% ((drop.Order-i):(drop.Order+i)))
+   #ggplot(drop1_1.dat, aes(Longitude, Latitude)) + geom_point(aes(colour = YldVolDry),size = 2)
+   dropped1.var <- variogram(drop1_1.dat$YldVolDry~1, 
+      locations=~Longitude+LatOff, data=drop1_1.dat)
+   dropped1.vgm <- fit.variogram(dropped1.var, vgm(800,"Exp",0.0004,500))
+   dropped1.krig <- krige(id="YldVolDry", formula=YldVolDry~1, 
+      data=drop1_1.dat, newdata=dropped.dat, model = dropped1.vgm,
+     locations=~Longitude+LatOff)
+   dropped.diffs <- dropped.dat$YldVolDry-dropped1.krig$YldVolDry.pred
+     pred1.ss <- sum((dropped.diffs)^2)
+   ss[i]<- pred1.ss
+   predicted <- c(predicted,dropped1.krig$YldVolDry.pred)
+   actual <- c(actual,dropped.dat$YldVolDry)
+   diffs <-  c(diffs,dropped.diffs)
+   range <- c(range, rep(i,length(dropped.diffs)))
+   latitude <- c(latitude,dropped.dat$LatOff)
+   current.plot <- ggplot(drop1_1.dat, aes(Longitude, LatOff)) + geom_point(aes(colour = YldVolDry),size = 2)
+   plots[[i]] <- current.plot
+}
+ss
+mean.dropped <- mean(dropped.dat$YldVolDry)
+total.ss <-  sum((sample.dat$YldVolDry-mean.dropped)^2)
+dropped.ss <-  sum((dropped.dat$YldVolDry-mean.dropped)^2)
+total.ss
+dropped.ss
+n <- length(dropped.dat$YldVolDry)
+dropped.ss/(n-1)
+total.ss/(n-1)
+ss/(n-1)
+sqrt(ss/(n-1))
+dropped.ss/(n-1)
+@
+
+\subsection{Kriging, Offset Field}
+
+
+pass.long <- tapply(corn.dat$Longitude,list(corn.dat$ImpPass),mean)
+pass.long <- tapply(corn.dat$Longitude,list(corn.dat$ImpPass),length)
+corn.dat$Order <- Order(pass.long)[corn.dat$ImpPass]
+
+corn.dat$PassOrder <- as.factor(corn.dat$Order)
+
+min.Order <- min(corn.dat$Order,na.rm=TRUE)
+max.Order <- max(corn.dat$Order,na.rm=TRUE)
+
+drop.Order <- floor(min.Order + (max.Order-min.Order)/2)
+drop1.dat <- subset(corn.dat,corn.dat$Order!=drop.Order)
+dropped.dat <- subset(corn.dat,corn.dat$Order==drop.Order)
+ss <- 1:9
+diffs <- c()
+range <- c()
+latitude <- c()
+predicted <- c()
+actual <- c()
+drop1_1.dat <- NA
+plots <- vector("list", length(ss))
+for(i in 1:length(ss)) {
+   drop1_1.dat <- subset(drop1.dat,drop1.dat$Order %in% ((drop.Order-i):(drop.Order+i)))
+   #ggplot(drop1_1.dat, aes(Longitude, Latitude)) + geom_point(aes(colour = YldVolDry),size = 2)
+   dropped1.var <- variogram(drop1_1.dat$YldVolDry~1, 
+      locations=~Longitude+LatOff, data=drop1_1.dat)
+   dropped1.vgm <- fit.variogram(dropped1.var, vgm(800,"Exp",0.0004,500))
+   dropped1.krig <- krige(id="YldVolDry", formula=YldVolDry~1, 
+      data=drop1_1.dat, newdata=dropped.dat, model = dropped1.vgm,
+     locations=~Longitude+LatOff)
+   dropped.diffs <- dropped.dat$YldVolDry-dropped1.krig$YldVolDry.pred
+     pred1.ss <- sum((dropped.diffs)^2)
+   ss[i]<- pred1.ss
+   predicted <- c(predicted,dropped1.krig$YldVolDry.pred)
+   actual <- c(actual,dropped.dat$YldVolDry)
+   diffs <-  c(diffs,dropped.diffs)
+   range <- c(range, rep(i,length(dropped.diffs)))
+   latitude <- c(latitude,dropped.dat$LatOff)
+   current.plot <- ggplot(drop1_1.dat, aes(Longitude, LatOff)) + geom_point(aes(colour = YldVolDry),size = 2)
+   plots[[i]] <- current.plot
+}
+ss
+mean.dropped <- mean(dropped.dat$YldVolDry)
+total.ss <-  sum((sample.dat$YldVolDry-mean.dropped)^2)
+dropped.ss <-  sum((dropped.dat$YldVolDry-mean.dropped)^2)
+total.ss
+dropped.ss
+n <- length(dropped.dat$YldVolDry)
+dropped.ss/(n-1)
+total.ss/(n-1)
+ss/(n-1)
+sqrt(ss/(n-1))
+dropped.ss/(n-1)
+
+
+\section*{Covariates}
+
+<<fig=TRUE>>=
+par(mfrow=c(2,2))
+hist(raw.dat$Moisture,main="Moisture")
+hist(raw.dat$CropFlw,main="CropFlw")
+hist(raw.dat$Speed,main="Speed")
+hist(raw.dat$Prod,main="Prod")
+par(mfrow=c(1,1))
+@
+
+
+<<fig=TRUE>>=
+ggplot(corn.dat, aes(Longitude, Latitude)) + geom_point(aes(colour = Track),size = 1)
+@
+<<fig=TRUE>>=
+ggplot(corn.dat, aes(Longitude, Latitude)) + geom_point(aes(colour = Elevation),size = 1)
+@
+<<fig=TRUE>>=
+ggplot(corn.dat, aes(Longitude, Latitude)) + geom_point(aes(colour = CropFlw),size = 1)
+@
+<<fig=TRUE>>=
+ggplot(corn.dat, aes(Longitude, Latitude)) + geom_point(aes(colour = Speed),size = 1)
+@
+<<fig=TRUE>>=
+ggplot(corn.dat, aes(Longitude, Latitude)) + geom_point(aes(colour = Prod),size = 1)
+@
+<<fig=TRUE>>=
+ggplot(corn.dat, aes(Longitude, Latitude)) + geom_point(aes(colour = CropFlwV),size = 1)
+<<fig=TRUE>>=
+ggplot(corn.dat, aes(Longitude, Latitude)) + geom_point(aes(colour = Swath),size = 1)
+@
+<<fig=TRUE>>=
+ggplot(corn.dat, aes(Longitude, Latitude)) + geom_point(aes(colour = Distance),size = 1)
+@
+
+<<fig=TRUE>>=
+ggplot(corn.dat, aes(CropFlw, YldVolDry)) + geom_point(aes(colour = Speed),size = 1)
+@
+<<fig=TRUE>>=
+ggplot(corn.dat, aes(Speed, YldVolDry)) + geom_point(aes(colour = CropFlw),size = 1)
+@
+
+<<fig=TRUE>>=
+ggplot(corn.dat, aes(Speed, CropFlw)) + geom_point(aes(colour = YldVolDry),size = 1)
+@
+
+
+
+
+<<fig=TRUE>>=
+sample.var <- variogram(sample.dat$YldVolDry~CropFlw, locations=~Longitude+Latitude, data=sample.dat)
+plot(sample.var,main="CropFlw")
+@
+
+<<fig=TRUE>>=
+sample.var <- variogram(sample.dat$YldVolDry~Speed, locations=~Longitude+Latitude, data=sample.dat)
+plot(sample.var,main="Speed")
+@
+
+<<fig=TRUE>>=
+sample.var <- variogram(sample.dat$YldVolDry~Swath, locations=~Longitude+Latitude, data=sample.dat)
+plot(sample.var,main="Swath")
+@
+
+<<fig=TRUE>>=
+sample.var <- variogram(sample.dat$YldVolDry~Elevation, locations=~Longitude+Latitude, data=sample.dat)
+plot(sample.var,main="Elevation")
+par(mfrow=c(1,1))
+@
+
+
+Using a spatial data frame
+> coordinates(a) <- ~x+y
+> coordinates(grd) <- ~x+y
+> q2 <- krige(id="z", formula=z~1, a, newdata=grd, model = m)
+@
+
+J creates a spatial frame using
+<<>>=
+coordinates(sample.dat) <- c("Longitude", "Latitude")
+@
+
+Compare with geoR variogram
+
+
+
+
+
+
+
+###This part you need to manually click on the plot to make a ploygon of the data points you want to capture, once you are done, 
+###right click ans choose "stop" 
+###then proceed to the coord.mats line and continue running
+
+
+bdry.pts <- locator(type="o") ##run this then click points to enclose the area of choice
+
+
+coords.mat <- matrix(unlist(bdry.pts), ncol = 2)
+coords.mat <- rbind(coords.mat,coords.mat[1,])
+bdry.poly <- vector(mode="list", length=1)
+bdry.poly[[1]] <- Polygons(list(Polygon(coords.mat)), ID="1")
+
+
+bdry.sp <- SpatialPolygons(bdry.poly, proj4string = CRS("+proj=longlat +datum=WGS84"))
+
+bdry.spdf <- SpatialPolygonsDataFrame(bdry.sp,data = data.frame(ID ="1", row.names = "1"))
+
+coordinates(corn.dat) <- c("Longitude", "Latitude")
+
+proj4string(bdry.spdf) = CRS("+proj=longlat +datum=WGS84")
+
+proj4string(corn.dat) = CRS("+proj=longlat +datum=WGS84")
+
+
+
+data.ol <- over(corn.dat,bdry.spdf)
+
+region.spdf <- corn.dat[which(is.na(data.ol$ID) == FALSE),]
+
+writePointsShape(region.spdf, "set2corn")
+
+
+region.spdf <- readShapePoints("set2corn")
+region.df   <- region.spdf@data
+
+
+plot(region.df$Longitude, region.df$Latitude)
+summary(region.df)
+
+
+
+write.csv(region.df, "corn1.csv") 
+
+data.setcorn2 <- read.csv("corn1.csv", header = TRUE)
+
+
+summary(data.setcorn2)
+
+
+plot(data.setcorn2$Yield)
+plot(data.setcorn2A$Longitude, data.setcorn2A$Latitude)
+
+
+x <- kriging(region.df$Longitude, region.df$Latitude, region.df$Yield)
+
+summary(krig.set)
+
+plot(x)
+
+par(mfrow=c(2,1))
+plot(data.setcorn2$Longitude, data.setcorn2$Latitude)
+plot(corn.dat$Longitude, corn.dat$Latitude)
+
+par(mfrow=c(1,3))
+
+plot(corn.dat$Longitude, corn.dat$Latitude)
+plot(data.set3$Longitude, data.set3$Latitude)
+plot(data.set4$Longitude, data.set4$Latitude)
+@
+
+elev.lm <- lm(YldVolDry~Elevation,corn.dat)
+summary(elev.lm)
+anova(elev.lm)
+<<fig=TRUE>>=
+ggplot(corn.dat, aes(Elevation,YldVolDry)) + geom_point(aes(color=Latitude),size=1) + geom_smooth(se=FALSE,method="lm")
+@
+<<fig=TRUE>>=
+ggplot(corn.dat, aes(Elevation,YldVolDry)) + geom_point(aes(color=Longitude),size=1) + geom_smooth(se=FALSE,method="lm")
+@
+
+
+
+

@@ -1,0 +1,23 @@
+---
+title: "Types of Spatial Error"
+author: "Peter Claussen"
+date: "Jun 17, 2020"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#F0E442","#CC79A7","#000000","#734f80", "#2b5a74", "#004f39", "#787221", "#003959", "#6aaf00", "#663cd3")
+```
+
+# Introduction
+
+From `cornVariogram.pdf`
+
+> This analysis is in contrast to more a commonly used method. In [@anselin.l-08-2004] and [@bongiovanni.r-2007] the field is analyzed as a lattice of 9.8 $\times$ 9.8 meter squares, although [@scharf.p-2005] argue that a 20m length is minimum for robust yield prediction, while [@kyveryga.p-01-2013] used 35m quadrats. The lattice may be rotated from true north to match the direction of planting. In [@anselin.l-08-2004] this reduces a set 8288 point estimates of yield to 1738 polygons. Anselin suggest this reduces errors associated with GPS yield monitor data. Bongiovanni [@bongiovanni.r-2007] present a more detailed discussion of the processes and errors associated with yield monitor data.
+
+

@@ -1,0 +1,554 @@
+---
+title: "Functional Data Analysis and Experimental Design for On-farm Strip Trials"
+author: "Peter Claussen"
+date: "10/13/2021"
+output:
+  bookdown::html_document2: default
+  bookdown::pdf_document2: default
+bibliography: biblio.bib
+---
+
+<!-- See ASA_CSSA_SSSA/2018/ThoughtsAboutPower -->
+
+```{r,echo=FALSE}
+library(splines)
+library(ggplot2)
+library(gridExtra)
+library(mgcv)
+library(brms)
+
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#F0E442","#CC79A7","#000000","#734f80", "#2b5a74", "#004f39", "#787221", "#003959", "#6aaf00", "#663cd3")
+grey <- cbPalette[1] #"#999999"
+orange <- cbPalette[2] #"#E69F00"
+skyblue <- cbPalette[3] #"#56B4E9"
+bluishgreen <- cbPalette[4] #"#009E73"
+yellow <- cbPalette[7] #"#F0E442"
+blue <- cbPalette[5] #"#0072B2"
+vermillion <- cbPalette[6] #"#D55E00"
+pair.colors <- c(2,5)
+```
+# Introduction
+
+Consider the example data from the previous section.
+
+```{r,echo=FALSE}
+load(file="~/Work/git/ASA_CSSA_SSSA/2017/Workshop/Case Study 2/Strips.Rda")
+```
+
+```{r,echo=FALSE}
+EastQuarter.dat$Pass <- floor(EastQuarter.dat$Northing/6)+1
+EastQuarter.dat$Pair <- floor((EastQuarter.dat$Pass+1)/2)
+EastQuarter.dat$Direction <- "Easterly"
+EastQuarter.dat$Direction[EastQuarter.dat$Heading>100] <- "Westerly"
+EastQuarter.dat$Direction <- as.factor(EastQuarter.dat$Direction)
+
+#EastQuarter.dat$Pass[EastQuarter.dat$Heading>100] <- EastQuarter.dat$Pass[EastQuarter.dat$Heading>100] + 400
+EastQuarter.dat$PassNo <- EastQuarter.dat$Pass
+
+EastQuarter.dat$Block <- ceiling(EastQuarter.dat$Pair/2)
+EastQuarter.dat$Strip <- EastQuarter.dat$Pair %/% EastQuarter.dat$Block
+EastQuarter.dat$Block <- as.factor(EastQuarter.dat$Block)
+EastQuarter.dat$Pass <- as.factor(EastQuarter.dat$Pass)
+EastQuarter.dat$Pair <- as.factor(EastQuarter.dat$Pair)
+EastQuarter.dat$Strip <- as.factor(EastQuarter.dat$Strip)
+
+
+```
+
+
+```{r}
+#We want to make interpretation of regression comparable to paired t-test differences, so reorder the product as a factor
+EastQuarter.dat$Product <- factor(EastQuarter.dat$Product,levels=c("E","B"))
+```
+
+
+```{r,eval=FALSE}
+ggplot(EastQuarter.dat, aes(Easting,Northing)) + 
+           geom_point(aes(colour = Block),size=2) + 
+           scale_colour_manual(values=cbPalette) +
+           labs(colour = "Block", x="Easting", y="Northing", title = "Seeding Map")
+```
+
+
+```{r,EastQuarterMaps,eval=FALSE,echo=FALSE,fig.width=8,fig.height=6}
+grid.arrange(
+  arrangeGrob(
+        ggplot(EastQuarter.dat, aes(Easting,Northing)) + 
+           geom_point(aes(colour = Product),size=2) + 
+           scale_colour_manual(values=cbPalette[pair.colors]) +
+           labs(colour = "Variety", x="Easting", y="Northing", title = "Seeding Map"),
+    ggplot(EastQuarter.dat, aes(Easting,Northing)) + 
+           geom_point(aes(colour = Yield),size=2) + 
+           scale_colour_gradient2(low=vermillion, mid=yellow, high=blue, midpoint = median(EastQuarter.dat$Yield)) +
+           labs(colour = "Yield", x="Easting", y="Northing",title="Harvest Map"),
+    nrow=2
+  )
+)
+```
+```{r,echo=FALSE,include=FALSE}
+means.dat <- with(EastQuarter.dat, data.frame(
+  Pass = aggregate(Yield ~ Pair,EastQuarter.dat,mean,na.rm=TRUE)[,1],
+  Yield = aggregate(Yield ~ Pair,EastQuarter.dat,mean,na.rm=TRUE)[,2],
+  Product = aggregate(as.numeric(Product) ~ Pair,EastQuarter.dat,mean,na.rm=TRUE)[,2],
+  Northing = aggregate(Northing ~ Pair,EastQuarter.dat,mean,na.rm=TRUE)[,2]
+))
+means.dat
+means.dat$Product <- levels(EastQuarter.dat$Product)[means.dat$Product]
+```
+
+```{r,echo=FALSE,include=FALSE}
+means.dat <- with(EastQuarter.dat, data.frame(
+  Pass = aggregate(Yield ~ Pass,EastQuarter.dat,mean,na.rm=TRUE)[,1],
+  Yield = aggregate(Yield ~ Pass,EastQuarter.dat,mean,na.rm=TRUE)[,2],
+  Product = aggregate(as.numeric(Product) ~ Pass,EastQuarter.dat,mean,na.rm=TRUE)[,2],
+  Northing = aggregate(Northing ~ Pass,EastQuarter.dat,mean,na.rm=TRUE)[,2]
+))
+means.dat
+means.dat$Product <- levels(EastQuarter.dat$Product)[means.dat$Product]
+```
+
+```{r}
+means.dat$Product <- factor(means.dat$Product,levels=c("E","B"))
+```
+
+
+This was shown as a bar plot. But what we see from the plot is that the treatments were not randomized. Variety E was also planted in a strip to the south of a strip planted with product B. This is inherent in the method used to plant the strips - a split planter method was used, such that one half the planter units received one variety and the other strip received the other variety. Thus, varieties were not randomized independently. 
+
+This can lead to variety effects being confounded with field effects. We can account for this by using a regression analysis to smooth the spatial trend, then add to the trend a term for variety. That is, our model for strip yields takes the form [@wood-2017, @hastie-1996]
+
+$$
+y_i = a_i\theta(x) + f(x) + \epsilon_i(x)
+$$
+In this case, $a_i$ is an indicator variable for variety. Variety E is the baseline or intercept, $a_i=0$ when the variety planted in strip $i$ is labelled `E`, while $a_i=1$ incorporates the additive effect if the variety planted in strip $i$ is variety labelled `B`. $f(x)$ is a smoothing function produced by the default `s` specification in `mgcv` `gam` function. 
+
+A first pass at using `gam` to provide a spatial trend smoother, we use strip means for harvest strips. There are two harvest strips for each variety, so there are two means per variety. The split-planter layout was duplicated six times, so there are 24 total mean estimates, two harvest strips per variety and two varieties per planted strip. Additionally, for each strip, the average `Northing` value is taken as the position of the strip.
+
+These data were fit to a generalized additive model using syntax of the form `Yield ~ Product + s(Northing)`, where `Product` is the parametric portion of the model and `Northing` is a spatial covariate. 
+
+```{r}
+Yield.gam <- gam(Yield ~ Product + s(Northing), data= means.dat)
+```
+
+```{r,PointEstimatesStripYield, include = FALSE,echo=FALSE,fig.width=8,fig.height=3}
+ggplot(means.dat, aes(x=Northing, y=Yield)) +
+  geom_point(aes(color=Product,fill=Product)) + scale_colour_manual(values=cbPalette[pair.colors]) + scale_fill_manual(values=cbPalette[pair.colors]) #+
+  #geom_smooth(method='gam')
+```
+
+
+```{r,eval=FALSE}
+plot(Yield.gam)
+```
+
+
+```{r,PointEstimatesWithPrediction, fig.cap="Point estimates of strip yield with predict yield from a GAM model", echo=FALSE,fig.width=8,fig.height=3}
+#Now we add the predicted values to the trend
+means.dat$Predicted <- predict(Yield.gam)
+ggplot(means.dat, aes(x=Northing, y=Yield)) +
+  geom_point(aes(color=Product,fill=Product)) + scale_colour_manual(values=cbPalette[pair.colors]) + scale_fill_manual(values=cbPalette[pair.colors]) +
+  geom_line(aes(x=Northing, y = Predicted),color=cbPalette[1])
+```
+
+Figure \@ref{fig:PointEstimatesWithPrediction} shows the point estimates of yield, along with GAM interpolation. The GAM interpolation show a general increase in yield from the south end of the field to the north end, which matches visual inspection of the raw data. The GAM interpolation form as gear-tooth pattern, as the `Product` effect is additive. The coefficient associated with variety B is 12.16, which suggest that variety B out-yields variety E by 12 bushels/acre. This estimate is smaller than we found by computing a paired $t$-test from strip yields (15.48 bu/acre, $B-E$). This suggest that the paired $t$ test was biased by the spatial trend. The associated $t$-statistic (computed using `summary` of the `gam` object) is 5.80, with an associated $p$-value $<0.0001$. 
+
+There are 9 coefficients associated with the smoothing portion of the model, with an effective degrees of freedom of 4.845 (see [@wood-2017], p 252 for a formal definition of effective degrees of freedom in a GAM model)
+
+```{r,eval=FALSE}
+anova(Yield.gam)
+summary(Yield.gam)
+```
+
+```{r,include=FALSE,echo=FALSE}
+Yield.sum <- summary(Yield.gam)
+#str(summary(Yield.sum))
+Yield.sum$p.coeff[2]
+Yield.sum$p.t[2]
+Yield.sum$p.pv[2]
+```
+
+Now, we extend this analysis to point-wise functional analysis. Each set of 24 strips was fit using the `gam` model `Yield ~ s(Easting)` to interpolate the raw yield monitor data per strip. Each fitted strip was then used to predict yield per strip at intervals ${2,4, \cdots, 398}$m from the western edge of the field. The smoothed yield data is shown in \@ref(fig:EastQuarterSmoothedPasses). For each point in the set ${2,4, \cdots, 398}$m the GAM smoother `Yield ~ Product + s(Northing)` was computed, where `Northing` was computed as the average of `Northing` values associated with the current strip, and the resulting coefficient associated with product along with $t$ and $p$ values. The results of this fit is shown in Figure \@ref(fig:CombinedTrends). 
+
+The coefficient associated with variety E varies along the length of the strip, with the most negative coefficients occurring on the eastern end of the field. Visual inspection of the yield map (Figure #) suggests that the eastern end is higher yielding, so the trend in Figure \@ref(fig:CombinedTrends) suggests that variety B tends to outperform variety E, but more-so when yield in general are higher. The coefficient associated with variety is statistically significantly different than 0 for most of the length of the field, which strengthens the assertion that variety B out yields variety E.
+
+```{r,ComputePassInterpolations, echo=FALSE,include=FALSE}
+smooth.basis <- rep(seq(2,398,by=2))
+total.passes <- max(EastQuarter.dat$PassNo)
+Smoothed.dat <- data.frame(
+  Yield = rep(0,total.passes*length(smooth.basis)),
+  Easting = rep(smooth.basis,total.passes),
+  PassNo = rep(1:total.passes,each=length(smooth.basis)),
+  Pair = rep(0,total.passes*length(smooth.basis)),
+  Product = rep(levels(EastQuarter.dat$Product),total.passes*length(smooth.basis)/2),
+  Northing = rep(0,total.passes*length(smooth.basis))
+)
+for(i in 1:total.passes) {
+  current.pass <- EastQuarter.dat[EastQuarter.dat$PassNo==i,]
+  current.gam <- gam(Yield ~ s(Easting),data=current.pass)
+  #current.gam <- gam(Yield ~ s(Easting,bs="ad"),data=current.pass)
+  current.smoothed <- predict(current.gam, data.frame(Easting = smooth.basis))
+  Smoothed.dat$Yield[Smoothed.dat$PassNo==i] <- current.smoothed
+  Smoothed.dat$Pair[Smoothed.dat$PassNo==i] <- current.pass$Pair[1]
+  Smoothed.dat$Product[Smoothed.dat$PassNo==i] <- as.character(current.pass$Product[1])
+  Smoothed.dat$Northing[Smoothed.dat$PassNo==i] <- mean(current.pass$Northing)
+}
+Smoothed.dat$Pass <- as.factor(Smoothed.dat$PassNo)
+Smoothed.dat$Product <- as.factor(Smoothed.dat$Product)
+```
+
+```{r,EastQuarterSmoothedPasses,fig.cap="Intepolated yield values for harvest strips from Example 1",eval=TRUE,echo=FALSE,fig.width=8,fig.height=3}
+ggplot(Smoothed.dat, aes(Easting,Yield)) + 
+geom_point(aes(colour = Product),size=.2) + 
+scale_colour_manual(values=cbPalette[pair.colors]) + 
+labs(colour = "Variety", x="Easting", y="Yield", title = "East Quarter, Harvest Strips") +
+  ylim(100, 240)
+```
+
+```{r, ComputePointwiseTrendAnalysis, echo=FALSE}
+smooth.basis <- rep(seq(2,398,by=2))
+Trends <- data.frame(
+  Easting = smooth.basis
+)
+for(i in 1:length(smooth.basis)) {
+  l <- smooth.basis[i]
+  obs <- Smoothed.dat[Smoothed.dat$Easting==l,]
+  current.gam <- gam(Yield ~ Product + s(Northing), data = obs)
+  #current.gam <- gam(Yield ~ Product + s(Northing,bs="ps"), data = obs)
+  #failed to converge after 400 iterations
+  #current.gam <- gam(Yield ~ Product + s(Northing,bs="ad"), data = obs)
+  current.sum <- summary(current.gam)
+  Trends$p.coeff[i] <- current.sum$p.coeff[2]
+  Trends$p.t[i] <- current.sum$p.t[2]
+  Trends$p.pv[i] <- current.sum$p.pv[2]
+  Trends$edf[i] <- current.sum$edf
+  Trends$rank[i] <- current.sum$rank
+}
+```
+
+
+```{r,CombinedTrends, fig.cap="Pointwise product E coefficient, t and p values", echo=FALSE,fig.width=8,fig.height=6}
+CombinedTrends <- data.frame(
+  Easting=rep(Trends$Easting,4),
+  Measure = c(rep('Treatment Coefficient',length(Trends$p.coeff)),
+              rep('t Ratio',length(Trends$p.t)),
+              rep('Probability>t',length(Trends$p.pv)),
+              rep('Effective d.f.',length(Trends$p.pv))),
+  Value = c(Trends$p.coeff,Trends$p.t,Trends$p.pv,Trends$edf),
+  Signficant = rep(Trends$p.pv<0.05,4)
+)
+CombinedTrends$Measure <- factor(CombinedTrends$Measure,levels=c('Treatment Coefficient','t Ratio','Probability>t','Effective d.f.'))
+ggplot(CombinedTrends, aes(Easting,Value)) + 
+geom_point(aes(color=Signficant)) + #cbPalette[1]) + 
+scale_colour_manual(values=cbPalette) +
+labs(x="Easting", title = "Functional Statistics") + facet_wrap(~ Measure,nrow = 4,scales="free_y")
+```
+
+There are unexpected discontinuities in the functional data statistics. We focus in particular in the region from about 210-240m. 
+
+```{r,CombinedTrendsSub, fig.cap="Pointwise product E coefficient, t and p values for points in the range of 210-240m Easting", echo=FALSE,fig.width=8,fig.height=6}
+mask = CombinedTrends$Easting %in% 210:240
+ggplot(CombinedTrends[mask,], aes(Easting,Value)) + 
+geom_point(aes(color=Signficant)) + #cbPalette[1]) + 
+scale_colour_manual(values=cbPalette) +
+labs(x="Easting", title = "Functional Statistics") + facet_wrap(~ Measure,nrow = 4,scales="free_y")
+```
+First, we plot the smoothed strips from that region of the field. Figure \@ref(fig:EastQuarterSmoothedPassesSub) show the strips from 210m to 240m from the field edge. Inspection of these curves reveals no obvious reason for discontinuities in the functional analysis.
+
+
+```{r,EastQuarterSmoothedPassesSub,eval=TRUE,echo=FALSE,fig.width=8,fig.height=3}
+Sub.dat <- Smoothed.dat[Smoothed.dat$Easting>=210,]
+Sub.dat <- Sub.dat[Sub.dat$Easting<=240,]
+ggplot(Sub.dat, aes(Easting,Yield)) + 
+geom_line(aes(colour = Product,group=Pass),linewidth=.2) + 
+scale_colour_manual(values=cbPalette[pair.colors]) + 
+labs(colour = "Variety", x="Easting", y="Yield", title = "East Quarter, Pooled Strips") +
+  ylim(100, 240)
+```
+
+This behavior of the fitted curves is troubling, so we examine the output of `gam`. Figure \@ref(fig:TrendAnalysisEDF) shows the effective degrees of freedom associated with each point-wise `gam` fit. Although effective degrees of freedom of the default `gam` smoothed model varies considerable along the length of the field, in regions corresponding to discontinuities in Figure \@ref(fig:CombinedTrends), effective degrees of freedom drops dramatically to less than 2, suggesting the models in these regions are not appropriately smoothed and may be under-fitting the field spatial trend. This is disconcerting, in that this suggests that for GAM models must be individually fit (by selecting smoothing parameters (`k`)) for each point in the set defined by ${2,4,\cdots,398}$. This is a large number of models, which makes point-wise functional trend analysis prohibitive for anything other than a small number of trials.
+
+To further investigate these discontinuities, we plot the effective degrees of freedom reported by `mgcv` `gam`. We see in \@ref(fig:CombinedTrends), lower graph, that the effective degrees of freedom generally varies between six and eight, but there are sudden drops to an EDF of 1 at distances corresponding to the discontinuities in the upper portions of the graph. 
+
+We might consider that the problem is with the basis functions, so we repeat the analysis, but using different basis. In \@ref(fig:EDFCompEDF) we see that both p-spline and adaptive spline basis also abruptly drop to 1 effective degrees of freedom for many of the point-wise trend estimates. We note that when we fit using `bs='ad'` we also need to specify `k=9`, since the default `k` for adaptive splines is larger than the number of points to be fit. In general, the default smoother seems the best behaved for finding trends across `Northing`.
+
+```{r,EDFCompDataFrame,echo=FALSE}
+EDFComp <- data.frame(
+  Easting = rep(smooth.basis, 3),
+  Basis = c(rep("default", length(smooth.basis)),
+            rep("bs='ps'", length(smooth.basis)),
+            rep("bs='ad'", length(smooth.basis)))
+            
+)
+
+EDFComp$EDF <- NA
+EDFComp$Rank <- NA
+```
+
+```{r,EDFCompCalculations,echo=FALSE}
+for(i in 1:length(smooth.basis)) {
+  l <- smooth.basis[i]
+  obs <- Smoothed.dat[Smoothed.dat$Easting==l,]
+  mask = EDFComp$Easting == l & EDFComp$Basis == "default"
+  current.default.gam <- gam(Yield ~ Product + s(Northing), data = obs)
+  current.default.sum <- summary(current.default.gam)
+  EDFComp$EDF[mask] <- current.default.sum$edf
+  EDFComp$Rank[mask] <- current.default.sum$rank
+  
+  mask = EDFComp$Easting == l & EDFComp$Basis == "bs='ps'"
+  current.ps.gam <- gam(Yield ~ Product + s(Northing,bs='ps'), data = obs)
+  current.ps.sum <- summary(current.ps.gam)
+  EDFComp$EDF[mask] <- current.ps.sum$edf
+  EDFComp$Rank[mask] <- current.ps.sum$rank
+  
+  mask = EDFComp$Easting == l & EDFComp$Basis == "bs='ad'"
+  current.ad.gam <- gam(Yield ~ Product + s(Northing,bs='ad',k=9), data = obs)
+  current.ad.sum <- summary(current.ad.gam)
+  EDFComp$EDF[mask] <- current.ad.sum$edf
+  EDFComp$Rank[mask] <- current.ad.sum$rank
+  
+}
+EDFComp$Basis <- factor(EDFComp$Basis, levels = c("default","bs='ps'","bs='ad'"))
+#EDFComp$Basis <- factor(EDFComp$Basis)
+```
+
+```{r,EDFCompEDF,fig.cap="Effective degrees of freedom associated with pointwise GAM fit to different bases",,eval=TRUE,echo=FALSE,fig.width=8,fig.height=3}
+ggplot(EDFComp, aes(Easting,EDF)) + 
+geom_line(aes(col=Basis), linewidth=1) + 
+scale_colour_manual(values=cbPalette) + 
+labs(colour = "Method", x="Easting", y="EDF", title = "Pointwise GAM Effective DF")
+```
+
+So, to further our investigation, we consider the models for trend analysis at `Easting` distances of 214 and 216.
+```{r,SubsetAndAnalyze21416,include=FALSE,echo=FALSE}
+Smoothed214.dat <- Smoothed.dat[Smoothed.dat$Easting==214,]
+Smoothed216.dat <- Smoothed.dat[Smoothed.dat$Easting==216,]
+Smoothed214.gam <- gam(Yield ~ Product + s(Northing), data = Smoothed214.dat)
+Smoothed216.gam <- gam(Yield ~ Product + s(Northing), data = Smoothed216.dat)
+summary(Smoothed214.gam)
+summary(Smoothed216.gam)
+plot(Smoothed214.gam)
+plot(Smoothed216.gam)
+```
+
+In Figure \@ref(fig:SubsetAndAnalyze21416RawDataPlot) we focus on trend analysis at 214 and 216 meters `Northing`. The points are interpolated yield estimates using the `mgcv` `gam` function on the 24 yield monitor data curves, while the lines are `mgcv` `gam` smoothing curves of `Yield` by `Northing`. We particularly note that the points are nearly superimposed over each other at similar `Northing` positions. This is to be expected since the point estimates are derived from smoothed functional forms of the original data. However, for `Northing` 214, the `gam` solver finds a curve with 7.7 effective degrees of freedom, while for `Northing` 216, with the same function arguments and nearly the same data, `gam` finds an interpolating curve with 1 degree of freedom - essentially a straight line for the smoothing part of the model. The curves themselves are not simple lines, since the `gam` model includes `Variety` in the fixed effects component of the model.
+
+```{r,SubsetAndAnalyze21416RawDataPlot,fig.cap="Yield estimates by Northing for Easting point 216", echo=FALSE,fig.width=8,fig.height=3}
+Smoothed214.dat$Easting <- 214
+Smoothed216.dat$Easting <- 216
+Smoothed214.dat$Predicted <- predict(Smoothed214.gam)
+Smoothed216.dat$Predicted <- predict(Smoothed216.gam)
+Smoothed2146.dat = rbind(Smoothed214.dat,Smoothed216.dat)
+Smoothed2146.dat$Easting <- as.factor(Smoothed2146.dat$Easting)
+ggplot(Smoothed2146.dat, aes(Northing,Yield)) + 
+geom_point(aes(col=Easting)) + #cbPalette[1]) + 
+geom_line(aes(Northing, Predicted, col=Easting),data=Smoothed2146.dat) +
+scale_colour_manual(values=cbPalette) +
+labs(x="Northing", title = "Yield Estimates at Easting 214 and 216")
+```
+
+## Adaptive Splines
+
+We now consider that the discontinuities follow from the method used to smooth the harvest passes. We repeat the above analysis, but this time base our regression on point-wise yield interpolations based on adaptive splines (`bs='ad' in `mgcv` notataion).
+
+```{r,ComputePassInterpolationsAD, echo=FALSE,include=FALSE}
+SmoothedAD.dat <- data.frame(
+  Yield = rep(0,total.passes*length(smooth.basis)),
+  Easting = rep(smooth.basis,total.passes),
+  PassNo = rep(1:total.passes,each=length(smooth.basis)),
+  Pair = rep(0,total.passes*length(smooth.basis)),
+  Product = rep(levels(EastQuarter.dat$Product),total.passes*length(smooth.basis)/2),
+  Northing = rep(0,total.passes*length(smooth.basis))
+)
+for(i in 1:total.passes) {
+  current.pass <- EastQuarter.dat[EastQuarter.dat$PassNo==i,]
+  #current.gam <- gam(Yield ~ s(Easting),data=current.pass)
+  current.gam <- gam(Yield ~ s(Easting,bs="ad"),data=current.pass)
+  current.smoothed <- predict(current.gam, data.frame(Easting = smooth.basis))
+  SmoothedAD.dat$Yield[SmoothedAD.dat$PassNo==i] <- current.smoothed
+  SmoothedAD.dat$Pair[SmoothedAD.dat$PassNo==i] <- current.pass$Pair[1]
+  SmoothedAD.dat$Product[SmoothedAD.dat$PassNo==i] <- as.character(current.pass$Product[1])
+  SmoothedAD.dat$Northing[SmoothedAD.dat$PassNo==i] <- mean(current.pass$Northing)
+}
+SmoothedAD.dat$Pass <- as.factor(SmoothedAD.dat$PassNo)
+SmoothedAD.dat$Product <- as.factor(SmoothedAD.dat$Product)
+```
+
+```{r,EastQuarterSmoothedPassesAD,fig.cap="Intepolated yield values for harvest strips from Example 1",eval=TRUE,echo=FALSE,fig.width=8,fig.height=3}
+ggplot(SmoothedAD.dat, aes(Easting,Yield)) + 
+geom_line(aes(colour = Product),linewidth=.2) + 
+scale_colour_manual(values=cbPalette[pair.colors]) + 
+labs(colour = "Variety", x="Easting", y="Yield", title = "East Quarter, Harvest Strips") +
+  ylim(100, 240)
+```
+
+```{r,ComputePointwiseTrendAnalysisAD, include=FALSE, echo=FALSE}
+TrendsAD <- data.frame(
+  Easting = smooth.basis
+)
+for(i in 1:length(smooth.basis)) {
+  l <- smooth.basis[i]
+  obs <- SmoothedAD.dat[SmoothedAD.dat$Easting==l,]
+  current.gam <- gam(Yield ~ Product + s(Northing), data = obs)
+  #current.gam <- gam(Yield ~ Product + s(Northing,bs="ps"), data = obs)
+  #failed to converge after 400 iterations
+  #current.gam <- gam(Yield ~ Product + s(Northing,bs="ad"), data = obs)
+  current.sum <- summary(current.gam)
+  TrendsAD$p.coeff[i] <- current.sum$p.coeff[2]
+  TrendsAD$p.t[i] <- current.sum$p.t[2]
+  TrendsAD$p.pv[i] <- current.sum$p.pv[2]
+  TrendsAD$edf[i] <- current.sum$edf
+  TrendsAD$rank[i] <- current.sum$rank
+}
+```
+
+
+```{r,CombinedTrendsAD, fig.cap="Pointwise product E coefficient, t and p values", echo=FALSE,fig.width=8,fig.height=6}
+CombinedTrendsAD <- data.frame(
+  Easting=rep(Trends$Easting,4),
+  Measure = c(rep('Treatment Coefficient',length(TrendsAD$p.coeff)),
+              rep('t Ratio',length(TrendsAD$p.t)),
+              rep('Probability>t',length(TrendsAD$p.pv)),
+              rep('Effective d.f.',length(TrendsAD$p.pv))),
+  Value = c(TrendsAD$p.coeff,TrendsAD$p.t,TrendsAD$p.pv,TrendsAD$edf),
+  Signficant = rep(TrendsAD$p.pv<0.05,4)
+)
+CombinedTrendsAD$Measure <- factor(CombinedTrendsAD$Measure,levels=c('Treatment Coefficient','t Ratio','Probability>t','Effective d.f.'))
+ggplot(CombinedTrendsAD, aes(Easting,Value)) + 
+geom_point(aes(color=Signficant)) + #cbPalette[1]) + 
+scale_colour_manual(values=cbPalette) +
+labs(x="Easting", title = "Functional Statistics") + facet_wrap(~ Measure,nrow = 4,scales="free_y")
+```
+ 
+As we see in \@ref(fig:CombinedTrendsAD), there are fewer discontinuities in the point-wise regression statistics, but discontinuities are not eliminated; in particular, there is a discontinuity at 190-200m. If we consider the effective degrees of freedom associated with each point-wise model, there are clear departures from a smoothly continuous function and points where the effective d.f. are 1, indicating a straight line estimate. In general, the variety effect estimates are very wiggly, in some cases masking the discontinuities. We need to look at the lower graph in Figure \@ref(fig:CombinedTrendsAD) to discern where there might be issues with adjacent trend analysis.
+
+
+## gam
+
+We consider using the `gam` function from the `gam` library. This function supports the `s` smoother syntax, but does not automatically adjust smoothing parameters for each fit, thus each point has the same smoother degrees of freedom. Further, the summary of the `gam` object does not include an estimate of fixed effect coefficients, only $F$ statistics are available. This does not allow us to easily determine the magnitude of varietal differences (see Figure \@ref(fig:CombinedTrendsGAM)), so the `gam` library is not an acceptable substitute for `mgcv` in this context.
+
+
+```{r, ComputePointwiseTrendAnalysisGAM, echo=FALSE}
+library(gam)
+TrendsGAM <- data.frame(
+  Easting = smooth.basis
+)
+for(i in 1:length(smooth.basis)) {
+  l <- smooth.basis[i]
+  obs <- Smoothed.dat[Smoothed.dat$Easting==l,]
+  current.gam <- gam(Yield ~ Product + s(Northing), data = obs)
+  current.sum <- summary(current.gam)
+  TrendsGAM$F[i] <- current.sum$parametric.anova[1,'F value']
+  TrendsGAM$pf[i] <- current.sum$parametric.anova[1,'Pr(>F)']
+  TrendsGAM$df[i] <- current.sum$anova[3,"Npar Df"]
+}
+detach("package:gam", unload=TRUE)
+library(mgcv)
+```
+
+```{r,CombinedTrendsGAM, fig.cap="Pointwise product E coefficient, t and p values estimated using the `gam` library", echo=FALSE,fig.width=8,fig.height=6}
+CombinedTrendsGAM <- data.frame(
+  Easting=rep(TrendsGAM$Easting,3),
+  Measure = c(rep('Treatment F',length(TrendsGAM$F)),
+              rep('Probability>F',length(TrendsGAM$pf)),
+              rep('Smoother d.f.',length(TrendsGAM$df))),
+  Value = c(TrendsGAM$F,TrendsGAM$pf,TrendsGAM$df),
+  Signficant = rep(TrendsGAM$pf<0.05,3)
+)
+CombinedTrendsGAM$Measure <- factor(CombinedTrendsGAM$Measure,levels=c('Treatment F','Probability>F','Smoother d.f.'))
+ggplot(CombinedTrendsGAM, aes(Easting,Value)) + 
+geom_point(aes(color=Signficant)) + #cbPalette[1]) + 
+scale_colour_manual(values=cbPalette) +
+labs(x="Easting", title = "Functional Statistics") + facet_wrap(~ Measure,nrow = 4,scales="free_y")
+```
+
+## brms
+
+We can also create a trend analysis using `brm`, but this is computationally slower than other methods. Each call to `brm` requires an associated C++ compilation call to compile the `stan` model generated by `brm`, and this takes the greater part of the analysis.
+
+`brm` by default does not provide null hypothesis tests. Consider the univariate case, where we regress the harvest pass means against position from south to north. We see in this case that `brm` produces confidence intervals for the fixed parameter estimates. This changes the nature of the presentation of a functional analysis of the data. Where in Figure \@ref(fig:CombinedTrends) we show the statistics associated with a null hypothesis test based on the $t$ statistic, in Figure \@ref(fig:CombinedTrendsBRM) we simply show the pointwise effect estimate for variety E along with the upper and lower confidence bands. Confidence intervals can also be used to create a dummy variable that controls coloring of the curves in Figure \@ref(fig:CombinedTrendsBRM) as significant or non-significant.
+
+
+
+```{r,echo=FALSE,include=FALSE}
+Yield.brm <- brm(Yield ~ Product + s(Northing), silent=2,refresh = 0, data= means.dat)
+```
+
+```{r,echo=FALSE,include=FALSE}
+summary(Yield.brm)
+hypothesis(Yield.brm, "ProductB=0")
+```
+
+```{r,echo=FALSE,include=FALSE}
+plot(Yield.brm)
+```
+
+```{r}
+Smoothed.dat$Product <- factor(Smoothed.dat$Product, levels=c("E","B"))
+```
+
+
+```{r, ComputePointwiseTrendAnalysisBRM, echo=FALSE,include=FALSE}
+if(!file.exists("Trend.brm")) {
+  start <- Sys.time()
+  TrendsBRM <- data.frame(
+    Easting = smooth.basis
+  )
+  for(i in 1:length(smooth.basis)) {
+    l <- smooth.basis[i]
+    obs <- Smoothed.dat[Smoothed.dat$Easting==l,]
+    current.brm <- brm(Yield ~ Product + s(Northing),silent=2,refresh = 0, data = obs)
+    current.sum <- summary(current.brm)
+    TrendsBRM$Coef[i] <- current.sum$fixed$Estimate[2]
+    TrendsBRM$Error[i] <- current.sum$fixed$Est.Error[2]
+    TrendsBRM$Sigma[i] <- current.sum$spec_pars$Estimate[1] #sigma
+    hypo.brm <- hypothesis(current.brm, "ProductB=0")
+    TrendsBRM$CI.Upper[i] <- hypo.brm$hypothesis$CI.Upper
+    TrendsBRM$CI.Lower[i] <- hypo.brm$hypothesis$CI.Lower
+  
+    #to test for significance, we check that the CI are of the same sign
+    TrendsBRM$Significant[i] <- sign(hypo.brm$hypothesis$CI.Lower) == sign(hypo.brm$hypothesis$CI.Upper)
+    #TrendsBRM$df[i] <- current.sum$anova[3,"Npar Df"]
+  }
+  end <- Sys.time()
+  BRMTime <- end-start
+  save(TrendsBRM,BRMTime,file="Trend.brm")
+} else {
+  load(file="Trend.brm")
+}
+```
+
+```{r}
+BRMTime
+```
+
+```{r,CombinedTrendsBRM, fig.cap="Pointwise product B coefficient and confidence intervals estimated using the `brm` library", echo=FALSE,fig.width=8,fig.height=3}
+ggplot(TrendsBRM, aes(Easting,Coef)) + 
+geom_point(aes(col=Significant),size=2) +
+ylim(c(min(TrendsBRM$CI.Lower), max(TrendsBRM$CI.Upper)))+
+geom_line(aes(Easting,CI.Upper),col=cbPalette[3],data=TrendsBRM) +
+geom_line(aes(Easting,CI.Lower),col=cbPalette[3],data=TrendsBRM) +
+scale_colour_manual(values=cbPalette) +
+labs(x="Easting",y = "Variety E Effect", title = "Variety Yield Difference")
+```
+
+We compare Figures \@ref(fig:CombinedTrends) and \@ref(fig:CombinedTrendsBRM). Discounting the discontinuities, the general shape of the estimated variety differences are similar; we see that the coefficient associated with variety E is smallest in the regions near 120 and 240 meters, and the difference greatest at 300 meters. From the general shape of the trend in Figure \@ref(fig:EastQuarterSmoothedPasses), we can surmise by inspection that there are low yielding zones for about half the harvest passes, centered at about 120 and 240 meters. In the region of 300 meters, the harvest pass yield is higher and generally more stable across with width of the field.
+
+If we consider the regression methods used here, we see that `mgcv` use with the default `s` arguments and `brm` produce similar estimates for the effect of variety E, and we can use the results to consider how spatial variability along the harvest passes affects these estimates. `mgcv` with the defaults is much faster, but produces discontinuities in the summary graphs (Figure \@ref(fig:CombinedTrends)). These discontinuities were not resolved by changing basis (Figure \@ref(fig:CombinedTrendsAD)).
+
+It would appear the for this type of regression, `brm` is a more stable solution, however, there is a penalty for computational time. Unlike `mgcv`, `brm` does not support $t$-tests of effects, instead the default summary of a `brm` analysis includes confidence intervals of parameter estimates. These can be used for tests of significance, but are not as easy to display using the `ggplot` `Facet` command, which was used to create the the plots in Figures \@ref(fig:CombinedTrends), \@ref(fig:CombinedTrendsAD), \@ref(fig:CombinedTrendsGAM) and \@ref(fig:CombinedTrendsBRM). $p$-values are not provided as part of the `brm` analysis, so are not displayed in Figure \@ref(fig:CombinedTrendsBRM) as with the other graphs. The `brm` plots are also less smooth, this is likely a side affect of the nature of `brm` computations. `brm` provides a front-end to the `stan` library, which implements MCMC sampling and so there is a degree of random variation for two adjacent point wise trend estimates.
+
+Additionally, the `brm` fitting process frequently produces warnings of the type 
+`Warning: Bulk Effective Samples Size (ESS) is too low, indicating posterior means and medians may be unreliable.
+Running the chains for more iterations may help. See
+https://mc-stan.org/misc/warnings.html#bulk-ess`
+`Warning: Tail Effective Samples Size (ESS) is too low, indicating posterior variances and tail quantiles may be unreliable.
+Running the chains for more iterations may help. See
+https://mc-stan.org/misc/warnings.html#tail-ess`
+`Warning: Parts of the model have not converged (some Rhats are > 1.05). Be careful when analysing the results! We recommend running more iterations and/or setting stronger priors.`
+These messages suggests that the MCMC methods implemented in `stan` via `brm` require detailed analysis of each functional data unit, something we are trying to avoid in developing methods for analyzing strip trials.
+
+
+The `gam` library offers a `gam` function that provides a default smoother, but this smoother is not adaptive and the default smoothness penalty is too large for the regressions at hand. It does not appear the the `gam` library will be of much benefit in resolving the problem of how to compute multiple trend analysis for functional data.
+
+
+
+# References

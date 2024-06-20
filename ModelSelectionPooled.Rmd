@@ -1,0 +1,70 @@
+---
+title: "Overview"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+
+set.seed(1000)
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(mgcv)
+library(splines)
+library(gstat)
+library(ape)
+
+  grey <- "#999999"
+  orange <- "#E69F00"
+  skyblue <- "#56B4E9"
+  bluishgreen <- "#009E73"
+  yellow <- "#F0E442"
+  blue <- "#0072B2"
+  vermillion <- "#D55E00"
+  
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#F0E442","#CC79A7","#000000","#734f80", "#2b5a74", "#004f39", "#787221", "#003959", "#6aaf00", "#663cd3")
+
+source('./R/remove.harvest.outliers.fn.R')
+source('./R/spatial.model.selection.R')
+```
+
+
+
+## Load Data
+
+```{r,eval=TRUE}
+harvest.E.2013.dat <- read.csv(file='../ManagementZoneML/data/E 2013 Soybean Harvest.csv')
+harvest.E.2014.dat <- read.csv(file='../ManagementZoneML/data/E 2014 Corn Harvest.csv')
+harvest.E.2015.dat <- read.csv(file='../ManagementZoneML/data/E 2015 Soybean Harvest.csv')
+harvest.E.2018.dat <- read.csv(file='../ManagementZoneML/data/E 2018 Corn Harvest.csv')
+harvest.E.2016.dat <- read.csv(file='../ManagementZoneML/data/E 2016 Corn Harvest.csv')
+harvest.E.2017.dat <- read.csv(file='../ManagementZoneML/data/E 2017 Soybean Harvest.csv')
+harvest.E.2019.dat <- read.csv(file='../ManagementZoneML/data/E 2019 Soybean Harvest.csv')
+```
+
+
+
+Model Complexity
+
+# bs 
+
+Year | A         | B            | C             | D             | E
+-----|-----------|--------------|---------------|---------------|-----------
+2013 |
+2014 | 17/35
+2015 | 30/35
+2016 | 26/17
+2017 | 12/35
+2018 | 12/17
+2019 | 17/17
+2020 |
+
+# gam
+
+# ns
+
+
+
+
+

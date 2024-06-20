@@ -44,15 +44,17 @@ source('./R/select.best.variogram.R')
 harvest.2013.dat <- read.csv(file='../ManagementZoneML/data/E 2013 Soybean Harvest.csv')
 harvest.2014.dat <- read.csv(file='../ManagementZoneML/data/E 2014 Corn Harvest.csv')
 harvest.2015.dat <- read.csv(file='../ManagementZoneML/data/E 2015 Soybean Harvest.csv')
-harvest.2018.dat <- read.csv(file='../ManagementZoneML/data/E 2018 Corn Harvest.csv')
 harvest.2016.dat <- read.csv(file='../ManagementZoneML/data/E 2016 Corn Harvest.csv')
 harvest.2017.dat <- read.csv(file='../ManagementZoneML/data/E 2017 Soybean Harvest.csv')
+harvest.2018.dat <- read.csv(file='../ManagementZoneML/data/E 2018 Corn Harvest.csv')
 harvest.2019.dat <- read.csv(file='../ManagementZoneML/data/E 2019 Soybean Harvest.csv')
+harvest.2020.dat <- read.csv(file='../ManagementZoneML/data/E 2020 Corn Harvest.csv')
+harvest.2021.dat <- read.csv(file='../ManagementZoneML/data/E 2021 Soybean Harvest.csv')
 ```
 
 
 
-# ns Selection
+# bs Selection
 
 
 ## 2019

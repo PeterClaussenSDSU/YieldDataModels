@@ -1,19 +1,26 @@
+
+
 ---
-title: "Functional Data Analysis and Experimental Design for On-farm Strip Trials"
+title: "Functional Forms for a Single Harvest Pass from Yield Monitor Data"
 author: "Peter Claussen"
 date: "10/13/2021"
 output:
-  html_document: default
-  pdf_document: default
+  bookdown::pdf_document2: default
+  bookdown::html_document2: default
+bibliography: biblio.bib
 ---
 
 <!-- See ASA_CSSA_SSSA/2018/ThoughtsAboutPower -->
 
-```{r,echo=FALSE}
+```{r,echo=FALSE,include=FALSE}
 library(splines)
 library(ggplot2)
 library(gridExtra)
 library(mgcv)
+#library(qpcR) # for PRESS statistic
+library(MPV)
+library(brms)
+library(fda)
 
 cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#F0E442","#CC79A7","#000000","#734f80", "#2b5a74", "#004f39", "#787221", "#003959", "#6aaf00", "#663cd3")
 grey <- cbPalette[1] #"#999999"
@@ -25,113 +32,22 @@ blue <- cbPalette[5] #"#0072B2"
 vermillion <- cbPalette[6] #"#D55E00"
 pair.colors <- c(2,5)
 ```
+
 # Introduction
 
+Before we can attempt a functional analysis of strip trial data, we need a method to converted raw yield monitor data to an appropriate functional form. Yield monitor data is both inherently noisy, and while measurements are taken uniform one second intervals, we wish to analysis functional forms of yield with a basis in the spatial position of the measured yields. That is, we need to convert yield monitor data that has a basis in time to a basis function that can be uniformly sampled in space.
 
+In this document, we explore different methods of finding functional forms of yield monitor data, using as an example a single harvest pass. The raw yield measurements for a single harvest pass are fit to smoothing functions using different libraries in R, in order to determine a function that is flexible enough to allow for some control of the smoothing but that also is sophisticated enough to find suitable smoothing curves without extensive supervision.
 
-## Functional Forms for Functional Data
-Consider each strip as an independent experimental unit, denoted $Y$. Where it is necessary to discuss multiple strips in the same context, we will use $Y_1, \dots, Y_k$ to denote $k$ strips. Further, we will denote a specific observation from $Y$ at the distance $d$ as $Y(d)$, thus denoting the specific observation as a function of distance.
+## Example Data
 
-In general, $Y(d)$ will take a functional form, with as associated measurement error
-
-$$
-Y(d) = \mathbf{A}{\mathbf{\theta}} + f(d) + e_i
-$$
-
-Generically, we can write $f(d)$ as
-
-$$
-f(d) = \sum _{j=1} ^k b_j(d) \beta_j
-$$
-
-where $b_j$ is the $j$ basis function over $d$.
-
-
-
-## Polynomial Functions
-Polynomial functions are frequently used as functional forms due to their simplicity and flexibility. Unlike power or exponential functions, polynomial functions can be fit to data using ordinary least squares (polynomial regression), while any number of data points can be fit exactly using polynomials of sufficiently high order.
-Polynomial functions take the form
-
-
-$$
-y_i = \beta_0 + \beta_1 x_i + \dots + \beta_{k} x_i^k +e
-$$
-Then we can represent this generically by $b_1(x) = x$ and $b_k(x) = x^k$
-
-
-
-The order of the polynomial is given by the magnitude of the largest exponent $n$, and $N+1$ data points can be fit perfectly (e=0) with a polynomial of order $k$. Thus, any midpoint value between two arbitrary points $x_i$ and $x_j$ can be interpolated exactly with a polynomial of order 1. i.e $y = a +bx_i$. One possible functional form for $y_{ij}$, then, computes $y(d)$ for any $d$ by identifying the $y_{ikK}$ bounding $d$ and finding the straight line interpolation between the points. 
-
-Pair-wise linear interpolation has the advantage of computational simplicity but does not minimize variance for the approximating function over the range of data
-
-# Basis functions
-Now, suppose instead of modeling $y$ as a linear response of $x$, we instead model $y$ as a response of a function of $x$, that is,
-
-$$
-y_i = \beta_0 + \beta_1 b_1(x_i) + \dots + \beta_{k} b_k(x_i) + e
-$$
-and we denote $b_1(\circ), b_2(\circ), \dots, b_k(\circ)$ as basis functions.
-
-
-One way to define the functions forms of $b$ is piece-wise regression. We limit sets of functions to a limited range of $x$, i.e. for a model with two piece-wise cubic polynomials we write
-
-$$
- y_i =   
-  \begin{cases}
-    \beta_{00} + \beta_{01} x_i + \beta_{02} x_i^2 + \beta_{03} x_i^3 & x_i < c \\
-    \beta_{10} + \beta_{11} x_i + \beta_{12} x_i^2 + \beta_{13} x_i^3 & x_i \geq c 
-  \end{cases}
-$$
-
-where $c$ forms a *knot* If there are $k$ knots, we require $k=1$ knots. Further, since each polynomial has 4 coefficients, we require $4*(k+1)$ or 8 coefficients or degrees of freedom to fit the data. However, there is one issue with this formulation - we have no guarantee that functions are smooth at the knots.
-
-We add three additional constrainsts to the piecewise regression model to produce a spline model - that the fitted curve is continuous at the knots, but also that the first and second derivatives are also continuous. These additional constraints consume a degree of freedom each (we have less flexibility in fitting the model), so our example for two cubic polynomials implemented as splines has 5 d.f. With $k$ knots, we can write our model in the form
-
-$$
-y_i = \beta_0 + \beta_1 b_1(x_i) + \dots + \beta_{k+2} b_{k+2}(x_i) + \beta_{k+3} b_{k+3}(x_i) + e
-$$
-
-##Types of splines 
-### Regression splines 
-### natural splines 
-### b-splines
-### smoothing splines
-
-# Choice of Knots
-
-How many knots should we choose to fit data, and where should the knots be located?
-
-
-Piece-wise interpolation.
-Splines
-
-# Generalized Additive Models
-
-A generalized additive model following from our previous examples may take the form (adapted from )
-
-$$
-g(y_i) = \mathbf{A_i} \mathbf{\theta} + f(x_{1i}) +f(x_{2i},x_{3i}) + e_i
-$$
-where $\mathbf{A_i} \mathbf{\theta}$ are the strictly parametric components of the model and  $f(\circ)$ is a function form of the covariate $x_1, \dots $. In the functional analysis of strip trials, $\mathbf{A_i} \mathbf{\theta}$ would represent the treatment structure while $f(x_{1i})$ represents a smooth function of yield over distance.
-
-In this case, we can assume $g(y_i)=y_i$ and $\mathbf{A_i} \mathbf{\theta} = \mu_i$, so this simplifies to a linear model with respect to the smoothing function. We will use distance from the west end of the field as covariate $\delta = x_1$
-
-$$
-y_i = f(\delta) + e_i
-$$
-
-## Forms of $f(\delta)$
-
-We'll use a single pass from the East Quarter (see FunctionalAnalysisStripTrials)
-# Materials and Methods
-
-## Example 1
+The example data are taken from the first data set, a split-planter variety trial. We take the first harvest pass of the data. The original yield observations for this harvest pass are shown in Figure \@ref(fig:RawSwath)
 
 ```{r,echo=FALSE}
 load(file="~/Work/git/ASA_CSSA_SSSA/2017/Workshop/Case Study 2/Strips.Rda")
 ```
 
-```{r,echo=FALSE}
+```{r,echo=FALSE,include = FALSE}
 EastQuarter.dat$Pass <- floor(EastQuarter.dat$Northing/6)+1
 EastQuarter.dat$Pair <- floor((EastQuarter.dat$Pass+1)/2)
 EastQuarter.dat$Direction <- "Easterly"
@@ -155,130 +71,904 @@ passes <- unique(EastQuarter.dat$Pass)
 SinglePass.dat <- EastQuarter.dat[EastQuarter.dat$Pass==passes[1],]
 ```
 
-# Polynomial Regression
-
-```{r}
-SinglePass1.lm <- lm(Yield ~ poly(Easting,1), data=SinglePass.dat)
-SinglePass.dat$Predicted1 <- predict(SinglePass1.lm)
-
-SinglePass2.lm <- lm(Yield ~ poly(Easting,6), data=SinglePass.dat)
-SinglePass.dat$Predicted2 <- predict(SinglePass2.lm)
-
-SinglePass3.lm <- lm(Yield ~ poly(Easting,11), data=SinglePass.dat)
-SinglePass.dat$Predicted3 <- predict(SinglePass3.lm)
-
-SinglePass4.lm <- lm(Yield ~ poly(Easting,16), data=SinglePass.dat)
-SinglePass.dat$Predicted4 <- predict(SinglePass4.lm)
-
-SinglePass5.lm <- lm(Yield ~ poly(Easting,21), data=SinglePass.dat)
-SinglePass.dat$Predicted5 <- predict(SinglePass5.lm)
-
-SinglePass6.lm <- lm(Yield ~ poly(Easting,26), data=SinglePass.dat)
-SinglePass.dat$Predicted6 <- predict(SinglePass6.lm)
-```
-
-```{r}
+```{r, RawSwath, fig.cap="Representative harvester passs with no smoothing.",label="RawSwath"}
 ggplot(SinglePass.dat, aes(Easting,Yield)) + 
-geom_point(size=.2,color=cbPalette[1]) + 
-  geom_line(aes(Easting,Predicted1),size=1,color=cbPalette[2]) + 
-  geom_line(aes(Easting,Predicted2),size=1,color=cbPalette[3]) + 
-  geom_line(aes(Easting,Predicted3),size=1,color=cbPalette[4]) + 
-  geom_line(aes(Easting,Predicted4),size=1,color=cbPalette[5]) + 
-  geom_line(aes(Easting,Predicted5),size=1,color=cbPalette[6]) + 
-  geom_line(aes(Easting,Predicted6),size=1,color=cbPalette[7]) + 
-scale_colour_manual(values=cbPalette[pair.colors]) + 
-labs(colour = "Variety", x="Easting", y="Yield", title = "Single Swath, Polynomial Smoothing")
+  geom_line(linewidth=1) + 
+  scale_colour_manual(values=cbPalette) + 
+labs(x="Easting", y="Yield", title = "Single Harvest Swath, No Smoothing")
 ```
 
-```{r}
-par(mfrow=c(2,3))
-qqnorm(resid(SinglePass1.lm))
-qqnorm(resid(SinglePass2.lm))
-qqnorm(resid(SinglePass3.lm))
-qqnorm(resid(SinglePass4.lm))
-qqnorm(resid(SinglePass5.lm))
-qqnorm(resid(SinglePass6.lm))
-```
+Figure \@ref(fig:RawSwath) shows the raw data from one harvest swath. We wish to model the data in the figure as a single discrete experimental entity ($y_i$), suitable for function data analysis. In functional data analysis, each discrete observation $y_i$ takes the form of a function $f_i(x)$, for $i=1,2,\cdots n$ and $x \in X$ where $X$ is a real interval [@ramsey-1991]. Thus, each $y_i$ is a point in a function space $H$. 
 
-```{r,eval=FALSE}
-summary(SinglePass1.lm)
-summary(SinglePass2.lm)
-summary(SinglePass3.lm)
-summary(SinglePass4.lm)
-summary(SinglePass5.lm)
-summary(SinglePass6.lm)
-```
+Commonly, $x$ is a measure of time [@ulah-04-2013], but for our data, $x$ is a measure of distance. In functional data analysis, it is common that the data are time-dependent, so a more common notation is $x_i(t)$ [@ramsey-1991]. However, for our purposes, the interval $X$ is a measure of distance (of the length of a strip), so we use the $x$ and $f(x)$ notation. 
 
-```{r}
-plot(c(AIC(SinglePass1.lm),AIC(SinglePass2.lm),AIC(SinglePass3.lm),AIC(SinglePass4.lm),AIC(SinglePass5.lm),AIC(SinglePass6.lm)))
-```
+Yield monitor data is measured at uniform time intervals, but our interest is the change from baseline induced by position in space. Yield in croplands tend to be dependent on local geographic or topographic features. We assume that for each harvest pass there is a function $F$ that is the true function of yield based on position in the field. We wish to find a functional representation $f$ that approximates the true function $F$. 
 
+We wish to find an optimal smoothing function $f$ that minimizes error, while preserving the features of the original data. Specifically, in the case of \@ref(fig:RawSwath), inspection of the data leads to the following features: A decrease from approximately 240 $bu/ac$ over the first 10m followed by a rise that appears to end at about 80m. There may be a slight decrease in yield from 80m to 110m, but yield appears stable from 110m to 160m. At 160m, there is an abrupt decrease in yield which rises to a more stable yield at about 210m. There may be small fluctuations in yield from 210m to 300m, where there appears to be a small decrease in yield from 300m to 330m, then yield appears stable until a possible decrease at 400m. A functional representation of the data should reflect the features we find by visual inspection of the raw data.
 
+We model the data for a single swath $i$ as in Figure \@ref(fig:RawSwath) as
 
-# ns Regression
+$$
+y_i(x_j) = f_i(x_j) + e_i(x_j)
+$$
+where $y_i(x_j)$ is the observed value from the harvest monitor at a discrete point in space identified by $x_j$, $f_i(x_j)$ is a smoothing function the interpolates observed values over the real interval $X$ and $e_i(x_j)$ is the difference between the smoothing function and the observed values.
 
-```{r}
-library(splines)
-SinglePass1.ns <- lm(Yield ~ ns(Easting,1), data=SinglePass.dat)
-SinglePass.dat$Predicted1 <- predict(SinglePass1.ns)
+We use the notation $\epsilon$ to denote the errors associated with the smoothing function. We will later use the notation $e_i$ to denote the experimental errors associated in the analysis of $y_i$
 
-SinglePass2.ns <- lm(Yield ~ ns(Easting,6), data=SinglePass.dat)
-SinglePass.dat$Predicted2 <- predict(SinglePass2.ns)
+We will limit our exploration of functional forms of $f_i(x_j)$ to the linear family of models. These models offer simplicity and in most cases differentiability. 
 
-SinglePass3.ns <- lm(Yield ~ ns(Easting,11), data=SinglePass.dat)
-SinglePass.dat$Predicted3 <- predict(SinglePass3.ns)
+# Representing $f$.
 
-SinglePass4.ns <- lm(Yield ~ ns(Easting,16), data=SinglePass.dat)
-SinglePass.dat$Predicted4 <- predict(SinglePass4.ns)
+To simplify discussion in this next section, we'll consider only a single functional variable $y$ and drop the $i$ subscript notation. We follow [@wood-2017], and represent a simple smoothing function of one covariate as
+\begin{equation}
+y = f(x) + e_i (\#eq:simple)
+\end{equation} 
+where $y$ is the response variable, $x$ is a covariate, $f$ is a smooth function and the $e_i$ are normally distributed random variables. In this context, we are looking to represent the true function $f$ that generates the data in Figure \@ref(fig:RawSwath)
 
-SinglePass5.ns <- lm(Yield ~ ns(Easting,21), data=SinglePass.dat)
-SinglePass.dat$Predicted5 <- predict(SinglePass5.ns)
+Several mathematical models exist that are used to approximate $f$. In this section we review some possible functional forms, again following [@wood-2017]. We define a *basis* as a space of functions which includes $f$ (or, at least, a close approximation) as an element. A basis is defined by some set of functions $b_j(x)$, $j = 1, \cdots, k$. We then represent $f$ as a sum of the basis functions,
 
-SinglePass6.ns <- lm(Yield ~ ns(Easting,26), data=SinglePass.dat)
-SinglePass.dat$Predicted6 <- predict(SinglePass6.ns)
-```
+\begin{equation}
+f(x) = \sum_{j=1}^k \beta_j b_j(x)
+\end{equation}
 
-```{r}
+with $\beta_j$ being unknown parameters.
+
+## Polynomial Functions
+
+Polynomial functions are frequently used as functional forms due to their simplicity and flexibility. Unlike power or exponential functions, polynomial functions can be fit to data using ordinary least squares (polynomial regression), while any number of data points can be fit exactly using polynomials of sufficiently high order.
+
+Polynomial functions take the form
+
+$$
+f(x) = \beta_0 + \beta_{1} x + \dots + \beta_{k} x^k
+$$
+where $k$ is the order of the polynomial. Clearly, a polynomial function forms a basis, where we can write the polynomial function as
+$$
+f(x) = \sum_{j=1}^{k+1} \beta_{j-1} x^{j-1}
+$$
+ Figure \@ref(fig:PolynomialSmoothing) show a polynomial of order 12 superimposed over the original data. This function in general smoothly interpolates the data, but does oversmooth the key feature at 180m. 
+
+```{r, PolynomialSmoothing, fig.cap="Interpolation of yield points using a linear model of degree 12", echo=FALSE}
+current.lm <- lm(Yield ~ poly(Easting,12), data=SinglePass.dat)
+Polynomial <- data.frame(
+  Easting = seq(min(SinglePass.dat$Easting), max(SinglePass.dat$Easting) ,len = 10000)
+)
+Polynomial$Yield <- predict(current.lm, newdata = Polynomial)
+     
 ggplot(SinglePass.dat, aes(Easting,Yield)) + 
-geom_point(size=.2,color=cbPalette[1]) + 
-  geom_line(aes(Easting,Predicted1),size=1,color=cbPalette[2]) + 
-  geom_line(aes(Easting,Predicted2),size=1,color=cbPalette[3]) + 
-  geom_line(aes(Easting,Predicted3),size=1,color=cbPalette[4]) + 
-  geom_line(aes(Easting,Predicted4),size=1,color=cbPalette[5]) + 
-  geom_line(aes(Easting,Predicted5),size=1,color=cbPalette[6]) + 
-  geom_line(aes(Easting,Predicted6),size=1,color=cbPalette[7]) + 
-scale_colour_manual(values=cbPalette[pair.colors]) + 
-labs(colour = "Variety", x="Easting", y="Yield", title = "Single Swath, ns spline Smoothing")
+   geom_line(size=1,color=cbPalette[1]) + 
+   geom_line(aes(Easting,Yield),linewidth=1,color=cbPalette[2],data=Polynomial)
 ```
 
-```{r}
-par(mfrow=c(2,3))
-qqnorm(resid(SinglePass1.ns))
-qqnorm(resid(SinglePass2.ns))
-qqnorm(resid(SinglePass3.ns))
-qqnorm(resid(SinglePass4.ns))
-qqnorm(resid(SinglePass5.ns))
-qqnorm(resid(SinglePass6.ns))
+
+
+## Local Smoothing
+
+A problem with polynomial regression is the regression is by definition global; the entire range of $x_i$ is fit by a single function This may allow for non-local influences. Data in one region, particularly points with unusual leverage, can influence the fit in other regions of the data [@fox-1997]. The order $k=12$ for Figure \@ref(fig:PolynomialSmoothing) was chosen arbitrarily. If we increase the order of the polynomial, we see dramatic oscillations in what appear by inspection to be relatively smooth parts of the original data, as we see in Figure \@ref(fig:SeveralPolynomials).
+
+```{r, SeveralPolynomials, fig.cap="Smoothing the raw data with polynomials of increasing order", label="SeveralPolynomials", echo=FALSE}
+#For some reason, I'm getting an error when poly(..., k>26)
+#for(i in 1:length(knots)) {
+knots = c(3,6,12,18,24,30,36) #redefined later in the code
+PredictionsLM.dat <- data.frame(
+  Easting = rep(SinglePass.dat$Easting, length(knots))
+)
+PredictionsLM.dat$Knots <- factor(rep(knots,each = length(SinglePass.dat$Easting)))
+PredictionsLM.dat$Yield <- NA
+
+for(i in 2:length(knots[1:5])) {
+  current.lm <- lm(Yield ~ poly(Easting,knots[i]), data=SinglePass.dat)
+  PredictionsLM.dat$Yield[PredictionsLM.dat$Knots==knots[i]] = predict(current.lm)
+}
+ggplot(PredictionsLM.dat, aes(Easting,Yield)) + 
+  geom_line(aes(Easting,Yield),size = 0.5, data=SinglePass.dat,color=cbPalette[1]) + 
+  geom_line(size=1,aes(color=Knots)) + 
+  scale_colour_manual(values=cbPalette[2:11]) + 
+  labs(colour = "Knots", x="Easting", y="Yield", title = "Single swath, polynomial smoothing")
 ```
 
-Functional Data Objects
+<!-- Thus, any midpoint value between two arbitrary points $x_i$ and $x_j$ can be interpolated exactly with a polynomial of order 1. i.e $y = a +bx_i$. One possible functional form for $y_{ij}$, then, computes $y(d)$ for any $d$ by identifying the $y_{ikK}$ bounding $d$ and finding the straight line interpolation between the points. -->
 
-```{r}
-library(fda)
+An alternative approach, piecewise linear regression, partitions the data into "bins", then fit a linear model restricted to the bin [@fox-1997]. The points at which the bins join are referred to as knots [@wood-2017], while the basis for this interpolation is a series of simple linear function.
 
+Let the knots be represented as ${x^{*}_j} : j = 1, \cdots, k$ such that $x^{*}_j>x^{*}_{j-1}$. For $j=2,\cdots, k-1$, we represent the basis functions as [@wood-2017]
+
+\begin{equation}
+b_j(x) = 
+  \begin{cases} 
+      (x-x^{*}_{j-1})/(x^{*}_j-x^{*}_{j-1}) &  x^{*}_{j-1} < x \le x^{*}_{j} \\
+      (x^{*}_{j+1}-x)/(x^{*}_{j+1}-x^{*}_{j}) & x^{*}_{j} < x \le x^{*}_{j+1} \\
+      0 & \text{otherwise}
+   \end{cases}
+\end{equation}
+
+with 
+$$
+b_1(x) =
+\begin{cases}
+(x^{*}_2-x)/(x^{*}_2 - x^{*}_1) & x < x^{*}_2 \\
+0 & \text{otherwise}
+\end{cases}
+$$
+and
+$$
+b_k(x) =
+\begin{cases}
+(x - x^{*}_{k-1})/(x^{*}_k - x^{*}_{k-1} ) & x > x^{*}_{k-1} \\
+0 & \text{otherwise}
+\end{cases}
+$$
+```{r,PiecewiseLinear, fig.cap="Piecewise linear interpolation", echo=FALSE}
+#code from wood-2017, p165/6
+tf <- function(x,xj,j) {
+  dj <- xj*0;dj[j] <- 1
+  approx(xj,dj,x)$y
+}
+tf.X <- function(x,xj) {
+  nk=length(xj);n <- length(x)
+  X <- matrix(NA,n,nk)
+  for (j in 1:nk) X[,j] = tf(x,xj,j)
+  X
+}
+Easting <- SinglePass.dat$Easting
+Yield <- SinglePass.dat$Yield
+sj <- seq(min(Easting),max(Easting),length=12)
+X <- tf.X(Easting,sj)
+b <- lm(Yield ~ X-1)
+s <- seq(min(Easting),max(Easting),length=length(Easting))
+Xp <- tf.X(s,sj)
+#plot(Easting,Yield)
+#lines(s,Xp %*% coef(b))
+Piecewise <- data.frame(
+  Easting = s
+)
+Piecewise$Yield <- Xp %*% coef(b)
+ggplot(SinglePass.dat, aes(Easting,Yield)) + 
+   geom_line(size=1,color=cbPalette[1]) + 
+   #geom_point(size=1,color=cbPalette[1]) + 
+   geom_line(aes(Easting,Yield),linewidth=1,color=cbPalette[2],data=Piecewise)
+```
+
+Figure \@ref(fig:PiecewiseLinear) shows piecewise linear regression superimposed on the original data. With 12 knots, piecewise linear regression appears to preserve key features of the original data. However, the choice of knots was be made by inspection; there is no automatic method for choosing knots. Code for this figure was adapted from [@wood-2017]
+<!-- 
+Piecewise <- data.frame(
+  Easting = seq(min(x), max(x) ,len = 10000)
+)
+Piecewise$Yield <- predict(model, newdata = data.frame(x = Piecewise$Easting))
+Knots = data.frame(
+  Easting = seq(min(x), max(x), len = K + 2)[-c(1, K + 2)]
+)
+Knots$Yield  = predict(model, newdata = data.frame(x = Knots$Easting))
+                           
+ggplot(SinglePass.dat, aes(Easting,Yield)) + 
+   geom_line(size=1,color=cbPalette[1]) + 
+   #geom_point(size=1,color=cbPalette[1]) + 
+   geom_line(aes(Easting,Yield),linewidth=1,color=cbPalette[2],data=Piecewise) +
+   geom_point(size=2,color=cbPalette[2],data=Knots) 
+-->
+
+<!-- LOWESS -->
+<!-- note, loess should be considered exploratory, but not explanatory -->
+
+## Spline Basis Functions
+
+Splines functions are commonly chosen as basis functions [@perperoglou-2019].  As with the piece wise regression model, spline models are commonly constrained to be continuous at the knots. Most splines also have the constraint that the first and second derivatives are also continuous; and in most cases cubic splines are used, such that a cubic polynomial interpolates the region between knots [@perperoglou-2019].
+
+<!--
+Following [@perperoglou-2019], a cubic spline function with three knots $x^{*}_1, x^{*}_2$ and $x^{*}_3$ can be represented as
+\begin{equation}
+f(x) = \beta_0 + \beta_1 x + \beta_2 x^2 + \beta_3 x^3 + \beta_4(x-x^{*}_1)^3 + \beta_5(x-x^{*}_2)^2 + \beta_6(x-x^{*}_3)^3
+\end{equation}
+-->
+
+[@wood-2017] p. 201 defines a cubic spline function $f(x)$ with $k$ knots, $x_1, \cdots x_k$, as
+
+\begin{equation}
+f(x) = a^-_j(x)f(x_j) + a^+_j(x) f(x_{j+1}) + c^-_j(x) f''(x_j) + c^+_j f''(x_{j+1}) \text{ if } x_j \le x \le x_{j+1}
+\end{equation}
+
+where 
+$$
+\begin{aligned}
+a^-_j(x) &= (x_{j+1}-x)/(x_{j+1}-x_{j}) \\
+a^+_j(x) &= (x-x_j)/(x_{j+1}-x_{j}) \\
+c^-_j(x) &= \left[ (x_{j+1} - x)^3/(x_{j+1}-x_{j}) - (x_{j+1}-x_{j})^2 \right] / 6\\
+c^+_j(x) &= \left[ (x-x_j)^3/(x_{j+1}-x_{j}) - (x_{j+1}-x_{j})(x-x_j)\right] / 6\\
+\end{aligned}
+$$
+
+# Types of splines
+
+Suppose we have knots defined by ${x_i, y_i : i=1,..,n}$. The natural cubic spline $g(x)$ is defined as a function over the bins defined by $[x_i, x_{i+1}]$ where a cubic polynomial interpolates over bin [wood-2017]. The knots are joined in such a way as the whole spline is continuous to the second derivative, while $g(x_i)=y_i$, while $g''(x_1) = g''(x_n) = 0$. Natural splines with $k$ knots will have $k+1$ degrees of freedom [@perperoglou-2019].
+
+B-splines are an alternative representation of a spline basis [@wood-2017, @perperoglou-2019]. We define $m+1$ as the order of the basis (so, for a cubic spline $m=2$). B-splines are non-zero over the interval between $m+3$ knots, so are more local that ordinary splines. A $k$ parameter b-spline is defined over $k+m+2$ knots[@wood-2017], so b-splines have $p+k$ degrees of freedom [@perperoglou-2019], where for cubic splines $p=3$. 
+An $(m+1)^{th}$ order b-spline takes the form 
+$$
+f(x) = \sum_{i=1}^k B^m_i(x) \beta_i
+$$
+
+The basis functions for b-splines are typically defined recursively [@wood-2017,@perperoglou-2019], taking the form [@wood-2017]
+
+$$
+B_i^m(x) = \frac{x-x_i}{x_i+m+1}B^{m-1}(x) + \frac{x_{i+m+2}-x}{x_{i+m+2}-x_i+1}B^{m-1}{i+1}(x), i = 1, \cdots, k
+$$
+with
+$$
+B^{-1}_i(x) = 
+\begin{cases} 
+      1 & x_i \leq x < x_{i+1} \\
+      0 & otherwise
+\end{cases}
+$$
+
+Extending the b-spline, we find p-splines [@eilers-1996]. First, we note that b-splines are usually fit using ordinary least squares regression, by minimizing an objective function taking the form
+$$
+S = \sum_{i=1}^m \left\{  y_i - \sum_{j=1}^n \beta_j B_j(x_i) \right\}^2
+$$
+
+
+P-splines add a finite difference penalty, so that the function to be minimized takes the form [@eilers-1996]
+$$
+S = \sum_{i=1}^m \left\{  y_i - \sum_{j=1}^n \beta_j B_j(x_i) \right\}^2 + \lambda \sum_{j=k+1}^n (\Delta^k \beta_j)^2
+$$
+where $\lambda$ is a tuning parameter to control the degree of penalization, and ultimately the "wiggliness" allowed when fitting the splines.
+
+A further extension to penalizes splines allows the penalty to be weighted according to the covariate $x$. We refer to these as adaptive splines, following [@wood-2017]
+
+# Fitting splines in R
+
+## Spline interpolation using simple linear regression
+
+We fit splines to the data using the `spline` library in R, as functions passed to `lm`, which is used to fit linear regression models. The `spline` library includes two functions that expand to spline bases, `ns` and `bs`. `ns` produces the basis matrix for natural splines, while `bs` produces the basis matrix for b-splines. 
+
+The `ns` function accepts `df` as an argument to controlling smoothness and the function chooses `df - 1 - intercept` knots. For illustration, we choose instead the argument `df=12+1`, so the resulting spline bases has 12 knots, comparable to the piecewise linear fit in Figure \@ref(fig:PiecewiseLinear) 
+
+`bs` chooses `df-degree` knots if `df` is passed an a argument. We illustrate the `bs` function by using the argument `df=15`. B-splines with 15 knots identifies similar features as with `ns` with 12 knots.
+
+```{r,SplineSmoothingCode,echo=FALSE}
+spline.knots = seq(0,1,length.out=12)
+current.lm <- lm(Yield ~ ns(Easting,df=12+1), data=SinglePass.dat)
+#current.lm <- lm(Yield ~ ns(Easting,knots=spline.knots), data=SinglePass.dat)
+NSplines <- data.frame(
+  Easting = seq(min(SinglePass.dat$Easting), max(SinglePass.dat$Easting),
+                len = length(SinglePass.dat$Yield))
+)
+NSplines$Yield <- predict(current.lm, newdata = NSplines)
+
+current.lm <- lm(Yield ~ bs(Easting,df=12+3), data=SinglePass.dat)
+#current.lm <- lm(Yield ~ bs(Easting,knots=spline.knots), data=SinglePass.dat)
+BSplines <- data.frame(
+  Easting = seq(min(SinglePass.dat$Easting), max(SinglePass.dat$Easting),
+                len = length(SinglePass.dat$Yield))
+)
+BSplines$Yield <- predict(current.lm, newdata = BSplines)
+```
+
+<!-- 
+## Smoothing Penalty
+
+In the previous examples, coefficients $\beta_i$ are estimated using ordinary least squares; that is, coefficients are found that minimize [@craven-1979]
+$$
+\frac{1}{n} \sum_{j=1}^n (f(x_j) -y_j)^2
+$$
+To estimate an optimal amount of smoothing, a penalty is introduced [@craven-1979]. The frequently takes the form
+$$
+\frac{1}{n} \sum_{j=1}^n (f(x_j) -y_j)^2 + \lambda \int_0^1(f^{(m)}(u))^2 du
+$$
+[@craven-1979] uses the notation $g_{n, \lambda}$ where $g \in W_2^(m)= {f: f,f', \cdots, f^{m-1} abs. cont., f^{(m)} \in \mathcal{L}_2[0,1]}$.
+-->
+
+
+## Fitting splines using generalized additive models
+
+We would prefer to use the `mgcv` library, or "Mixed GAM Computation Vehicle with Automatic Smoothness Estimation" [@wood-2017] to find smoothing functions for our harvest pass data. The `mgcv` 
+
+In the broad sense, a generalized additive model takes the form (adapted from [@wood-2017])
+
+$$
+g(y_i) = \mathbf{A_i} \mathbf{\theta} + f(x_{1}) + f(x_2, x_3) + e_i
+$$
+where $\mathbf{A_i} \mathbf{\theta}$ are the strictly parametric components of the model and  $f(\circ)$ is a function form of the covariate $x_i$. 
+
+In this case, we can assume $g(y_i)=y_i$ and $\mathbf{A_i} \mathbf{\theta} = \mu_i$, so this simplifies to a linear model with respect to the smoothing function, thus is of the form $y_i = f(x) + e_i$
+
+<!--
+$$
+y_i = f_i(x) + e_i
+$$
+
+where $y_i$ is a response variable, $x$ is a covariate, $f$ is a smooth function the $e_i$ are independent $\mathcal{N}(0,\sigma^2)$ random variables [@wood-2017]. (Much of the next discussion is taken from [@wood-2017])
+
+We require that $f$ can be represented as a linear model. The problem then is choose a *basis* for $f$, which requires selecting an appropriate set of *basis functions*. Suppose $b_j$ is the $j^th$ basis function, then we write $f$ as
+
+$$
+f = \sum_{j=1}^k b_j(x) \beta_j
+$$
+where $\beta_j$ are unknown parameters. Then 
+$$
+y_i = \sum_{j=1}^k b_j(x) \beta_j + e_i
+$$
+is a linear model.
+-->
+
+The `mcgv` function using the `s(x, ...)` syntax to define a smoothing function over a covariate and `...` are additional arguments, such as `bs="bs"` that specify the smoothing basis, or `k` for the maximum number of knots to be fit. 
+
+In Figure \@ref(fig:ComparingSplineFits), we compare `ns` and `bs` fit to the single swath example and and equivalent b-spline fit using `mcgv` `gam`. We see that the `ns` fit with `df=12+1`, `bs` fit with `df=12+3` and `s(Easting,bs="bs",k=16)` product interpolating functions that are nearly identical except small differences at the edges. 
+
+```{r,GAMSmoothing, echo=FALSE}
+library(mgcv)
+current.gam <- gam(Yield ~ s(Easting,bs="bs",k=16), data=SinglePass.dat)
+GAMSmooth <- data.frame(
+  Easting = seq(min(SinglePass.dat$Easting), max(SinglePass.dat$Easting) ,
+                len = length(SinglePass.dat$Yield))
+)
+GAMSmooth$Yield <- predict(current.gam, newdata = GAMSmooth)
+SinglePass.dat$Method = "Original Data"
+NSplines$Method = "lm ns, df=12+1"
+BSplines$Method = "lm bs, df=12+3"
+GAMSmooth$Method = "gam bs, k=16"
+Comparison1.dat <- rbind(SinglePass.dat[,c("Easting","Yield","Method")],
+                         NSplines,
+                         BSplines,
+                         GAMSmooth)
+Comparison1.dat$Method <- factor(Comparison1.dat$Method,levels=c("Original Data","lm ns, df=12+1","lm bs, df=12+3","gam bs, k=16"))
+```
+
+```{r,ComparingSplineFits, fig.cap = "Comparable smoothing interpolation using lm and gam", label="ComparingSplineFits"}
+ggplot(Comparison1.dat, aes(Easting,Yield)) + 
+   geom_line(size=1,aes(color=Method)) +
+   scale_colour_manual(values=cbPalette[1:11])
+```
+
+In our examples, we provide smoothing parameter such as `k`. But to fit many harvest passes, an automatic smoothing method would be preferred, since it may not be practical to find an optimal smoothing parameters for each of dozens of harvest passes, if multiple trials are to be analyzed. In our example data, we have 24 harvest passes for the first example, and 24 harvest passes for the second example. We would prefer to automate smoothing as much as possible to make analysis of multiple trials practical.
+
+In Figure \@ref(fig:ComparingGAMSplines) we compare default smoothing functions fit using `mgcv` `gam` with different arguments to `s(..., bs = "*")`, where `*` is one of `"bs"` for ordinary basis splines, `"ps"` for penalized splines and `"ad"` for adaptive splines. The default basis for `s(...)` with no arguments are thin-plate splines. Thin-plate splines are a form of penalized splines that provide a general solution to smoothing functions of multiple variables [@wood-2017]. No other arguments are supplied to the `s` function, other than the covariate `Easting`, that is, the function invocation takes the form `gam(Yield ~ s(Easting)` or `gam(Yield ~ s(Easting,bs="bs")`, etc..
+
+
+```{r,echo=FALSE}
+default.gam <- gam(Yield ~ s(Easting),data=SinglePass.dat)
+MGCVDefault <- data.frame(
+  Easting = seq(min(SinglePass.dat$Easting), max(SinglePass.dat$Easting) ,
+                len = length(SinglePass.dat$Yield))
+)
+MGCVDefault$Yield <- predict(default.gam, newdata = MGCVDefault)
+
+default.gambs <- gam(Yield ~ s(Easting,bs="bs"),data=SinglePass.dat)
+MGCVBSDefault <- data.frame(
+  Easting = seq(min(SinglePass.dat$Easting), max(SinglePass.dat$Easting) ,
+                len = length(SinglePass.dat$Yield))
+)
+MGCVBSDefault$Yield <- predict(default.gambs, newdata = MGCVBSDefault)
+
+default.gamps <- gam(Yield ~ s(Easting,bs="ps"),data=SinglePass.dat)
+MGCVPSDefault <- data.frame(
+  Easting = seq(min(SinglePass.dat$Easting), max(SinglePass.dat$Easting) ,
+                len = length(SinglePass.dat$Yield))
+)
+MGCVPSDefault$Yield <- predict(default.gamps, newdata = MGCVPSDefault)
+
+default.gamad <- gam(Yield ~ s(Easting,bs="ad"),data=SinglePass.dat)
+MGCVADDefault <- data.frame(
+  Easting = seq(min(SinglePass.dat$Easting), max(SinglePass.dat$Easting) ,
+                len = length(SinglePass.dat$Yield))
+)
+MGCVADDefault$Yield <- predict(default.gamad, newdata = MGCVADDefault)
+
+SinglePass.dat$Method = "Original Data"
+MGCVDefault$Method = "mgcv default"
+MGCVBSDefault$Method = "mgcv bs"
+MGCVPSDefault$Method = "mgcv ps"
+MGCVADDefault$Method = "mgcv ad"
+Comparison2.dat <- rbind(SinglePass.dat[,c("Easting","Yield","Method")],
+                         MGCVDefault,
+                         MGCVBSDefault,
+                         MGCVPSDefault,
+                         MGCVADDefault)
+Comparison2.dat$Method <- factor(Comparison2.dat$Method,levels=c("Original Data",
+                                                                 "mgcv default",
+                                                                 "mgcv bs",
+                                                                 "mgcv ps",
+                                                                 "mgcv ad"))
+
+```
+
+```{r, ComparingGAMSplines, fig.cap = "Different spline smoothers using gam defaults", echo=FALSE}
+ggplot(Comparison2.dat, aes(Easting,Yield)) + 
+   geom_line(size=1,aes(color=Method)) +
+   scale_colour_manual(values=cbPalette[1:11])
+```
+
+
+```{r,include=FALSE}
+#Create a data frame to hold the predictions from different linear models.
+#k = c(1,6,11,16,21,26)
+knots = c(3,6,12,18,24,30,36)
+#k = c(11,16,26)
+#k = c(1,6,11,16,21,26,31,36,41,46)
+PredictionsNS.dat <- data.frame(
+  Easting = rep(SinglePass.dat$Easting, length(knots))
+)
+PredictionsNS.dat$Knots <- factor(rep(knots,each = length(SinglePass.dat$Easting)))
+PredictionsNS.dat$Yield <- NA
+
+PredictionsBS.dat <- data.frame(
+  Easting = rep(SinglePass.dat$Easting, length(knots))
+)
+PredictionsBS.dat$Knots <- factor(rep(knots,each = length(SinglePass.dat$Easting)))
+PredictionsBS.dat$Yield <- NA
+
+PredictionsGAM.dat <- data.frame(
+  Easting = rep(SinglePass.dat$Easting, length(knots))
+)
+PredictionsGAM.dat$Knots <- factor(rep(knots,each = length(SinglePass.dat$Easting)))
+PredictionsGAM.dat$Yield <- NA
+
+PredictionsGAMBS.dat <- data.frame(
+  Easting = rep(SinglePass.dat$Easting, length(knots))
+)
+PredictionsGAMBS.dat$Knots <- factor(rep(knots,each = length(SinglePass.dat$Easting)))
+PredictionsGAMBS.dat$Yield <- NA
+
+PredictionsGAMPS.dat <- data.frame(
+  Easting = rep(SinglePass.dat$Easting, length(knots))
+)
+PredictionsGAMPS.dat$Knots <- factor(rep(knots,each = length(SinglePass.dat$Easting)))
+PredictionsGAMPS.dat$Yield <- NA
+
+PredictionsGAMAD.dat <- data.frame(
+  Easting = rep(SinglePass.dat$Easting, length(knots))
+)
+PredictionsGAMAD.dat$Knots <- factor(rep(knots,each = length(SinglePass.dat$Easting)))
+PredictionsGAMAD.dat$Yield <- NA
+
+PredictionsBRM.dat <- data.frame(
+  Easting = rep(SinglePass.dat$Easting, length(knots))
+)
+
+PredictionsBRM.dat$Knots <- factor(rep(knots,each = length(SinglePass.dat$Easting)))
+PredictionsBRM.dat$Yield <- NA
+
+PredictionsFDA.dat <- data.frame(
+  Easting = rep(SinglePass.dat$Easting, length(knots))
+)
+
+PredictionsFDA.dat$Knots <- factor(rep(knots,each = length(SinglePass.dat$Easting)))
+PredictionsFDA.dat$Yield <- NA
+```
+
+```{r,include=FALSE}
+#create a data frame to hold AdjRSqr values
+SplitsComp.dat <- data.frame(
+  Knots = rep(knots,7),
+  Method = rep(c("lm ns", "lm bs", "mgcv default", "mgcv bs", "mgcv ps","mgcv ad", "fda"), each= length(knots))
+)
+SplitsComp.dat$Method <- factor(SplitsComp.dat$Method, 
+                                levels=c("lm ns", "lm bs", "mgcv default", "mgcv bs", "mgcv ps","mgcv ad", "fda"))
+
+#SplitsComp.dat$AdjRSqr <- NA
+SplitsComp.dat$OCV <- NA
+#SplitsComp.dat$GCV <- NA
+#SplitsComp.dat$DF <- NA
+```
+
+```{r,include=FALSE}
+# ns Regression Smoothing
+for(i in 2:length(knots)) {
+  current.lm <- lm(Yield ~ ns(Easting,df=knots[i]+1), data=SinglePass.dat)
+  PredictionsNS.dat$Yield[PredictionsNS.dat$Knots==knots[i]] = predict(current.lm)
+  mask <- SplitsComp.dat$Knots == knots[i] & SplitsComp.dat$Method == "lm ns"
+  current.summary <- summary(current.lm)
+  #SplitsComp.dat$AdjRSqr[mask] <- current.summary$adj.r.squared
+  #SplitsComp.dat$DF[mask] <- anova(current.lm)[1,'Df']
+  
+  sum <- 0
+  for(j in 1:dim(SinglePass.dat)[1]) {
+    current.d <- SinglePass.dat[-j,]
+    current.model <- lm(Yield ~ ns(Easting,df=knots[i]+1), data=current.d)
+    new.dat <- SinglePass.dat[j,]
+    predicted <- predict(current.model, newdata = new.dat)
+    diff <- predicted - new.dat$Yield
+    sum  <- sum+(diff)^2
+  }
+  SplitsComp.dat$OCV[mask] <- sum/dim(SinglePass.dat)[1]
+}
+```
+
+```{r,include=FALSE}
+# bs Regression Smoothing
+for(i in 1:length(knots)) {
+  #df degrees of freedom; one can specify df rather than knots; bs() then chooses df-degree (minus 
+  #one if there is an intercept) knots at suitable quantiles of x (which will ignore missing values).
+  #The default, NULL, takes the number of inner knots as length(knots). If that is zero as per 
+  #default, that corresponds to df = degree - intercept.
+  
+  current.lm <- lm(Yield ~ bs(Easting,df=knots[i]+3), data=SinglePass.dat)
+  PredictionsBS.dat$Yield[PredictionsBS.dat$Knots==knots[i]] = predict(current.lm)
+  mask <- SplitsComp.dat$Knots == knots[i] & SplitsComp.dat$Method == "lm bs"
+  current.summary <- summary(current.lm)
+  #SplitsComp.dat$AdjRSqr[mask] <- current.summary$adj.r.squared
+  #SplitsComp.dat$PRESS[mask] <- PRESS(current.lm)
+  #SplitsComp.dat$DF[mask] <- anova(current.lm)[1,'Df']
+  sum <- 0
+  for(j in 1:dim(SinglePass.dat)[1]) {
+    current.d <- SinglePass.dat[-j,]
+    current.model <- lm(Yield ~ bs(Easting,df=knots[i]+3), data=current.d)
+    new.dat <- SinglePass.dat[j,]
+    predicted <- predict(current.model, newdata = new.dat)
+    diff <- predicted - new.dat$Yield
+    sum  <- sum+(diff)^2
+  }
+  SplitsComp.dat$OCV[mask] <- sum/dim(SinglePass.dat)[1]
+}
+```
+
+```{r,include=FALSE}
+# mgcv gam Smoothing
+#From `mgcv:gam` help, `choose.k`
+#In practice k-1 (or k) sets the upper limit on the degrees of freedom associated with an s smooth (1 degree of freedom is usually lost to the identifiability constraint on the smooth).
+for(i in 1:length(knots)) {
+  current.lm <- gam(Yield ~ s(Easting,k=knots[i]+4), data=SinglePass.dat)
+  #gam.check(current.lm)
+  PredictionsGAM.dat$Yield[PredictionsGAM.dat$Knots==knots[i]] = predict(current.lm)
+  mask <- SplitsComp.dat$Knots == knots[i] & SplitsComp.dat$Method == "mgcv default"
+  #current.summary <- summary(current.lm)
+  #SplitsComp.dat$AdjRSqr[mask] <- current.summary$r.sq
+  #SplitsComp.dat$PRESS[mask] <- PRESS(current.lm)
+  #SplitsComp.dat$DF[mask] <- current.summary$rank
+  #SplitsComp.dat$DF[mask] <- knots[i]
+  sum <- 0
+  for(j in 1:dim(SinglePass.dat)[1]) {
+    current.d <- SinglePass.dat[-j,]
+    current.model <- gam(Yield ~ s(Easting,k=knots[i]+4), data=current.d)
+    new.dat <- SinglePass.dat[j,]
+    predicted <- predict(current.model, newdata = new.dat)
+    diff <- predicted - new.dat$Yield
+    sum  <- sum+(diff)^2
+  }
+  SplitsComp.dat$OCV[mask] <- sum/dim(SinglePass.dat)[1]
+}
+```
+
+
+```{r,include=FALSE}
+# GAM bs
+#I get an error with k=3 with GAM ps
+for(i in 1:length(knots)) {
+  current.lm <- gam(Yield ~ s(Easting,bs="bs", k=knots[i]+4), data=SinglePass.dat)
+  #gam.check(current.lm)
+  PredictionsGAMBS.dat$Yield[PredictionsGAMBS.dat$Knots==knots[i]] = predict(current.lm)
+  mask <- SplitsComp.dat$Knots == knots[i] & SplitsComp.dat$Method == "mgcv bs"
+  #current.summary <- summary(current.lm)
+  #SplitsComp.dat$AdjRSqr[mask] <- current.summary$r.sq
+  #SplitsComp.dat$DF[mask] <- knots[i] 
+  sum <- 0
+  for(j in 1:dim(SinglePass.dat)[1]) {
+    current.d <- SinglePass.dat[-j,]
+    current.model <- gam(Yield ~ s(Easting,bs="bs",k=knots[i]+4), data=current.d)
+    new.dat <- SinglePass.dat[j,]
+    predicted <- predict(current.model, newdata = new.dat)
+    diff <- predicted - new.dat$Yield
+    sum  <- sum+(diff)^2
+  }
+  SplitsComp.dat$OCV[mask] <- sum/dim(SinglePass.dat)[1]
+}
+```
+
+```{r,include=FALSE}
+# GAM ps
+#I get an error with k=3 with GAM ps
+for(i in 2:length(knots)) {
+  current.lm <- gam(Yield ~ s(Easting,bs="ps", k=knots[i]+4), data=SinglePass.dat)
+  #gam.check(current.lm)
+  PredictionsGAMPS.dat$Yield[PredictionsGAMPS.dat$Knots==knots[i]] = predict(current.lm)
+  mask <- SplitsComp.dat$Knots == knots[i] & SplitsComp.dat$Method == "mgcv ps"
+  #current.summary <- summary(current.lm)
+  #SplitsComp.dat$AdjRSqr[mask] <- current.summary$r.sq
+  #SplitsComp.dat$PRESS[mask] <- PRESS(current.lm)
+  #SplitsComp.dat$DF[mask] <- current.summary$rank
+  #SplitsComp.dat$DF[mask] <- knots[i] 
+  sum <- 0
+  for(j in 1:dim(SinglePass.dat)[1]) {
+    current.d <- SinglePass.dat[-j,]
+    current.model <- gam(Yield ~ s(Easting,bs="ps",k=knots[i]+4), data=current.d)
+    new.dat <- SinglePass.dat[j,]
+    predicted <- predict(current.model, newdata = new.dat)
+    diff <- predicted - new.dat$Yield
+    sum  <- sum+(diff)^2
+  }
+  SplitsComp.dat$OCV[mask] <- sum/dim(SinglePass.dat)[1]
+}
+```
+
+```{r,include=FALSE}
+# GAM ad
+#I get an error with k<12
+for(i in 3:length(knots)) {
+  current.lm <- gam(Yield ~ s(Easting,bs="ad", k=knots[i]+4), data=SinglePass.dat)
+  #gam.check(current.lm)
+  PredictionsGAMAD.dat$Yield[PredictionsGAMAD.dat$Knots==knots[i]] = predict(current.lm)
+  mask <- SplitsComp.dat$Knots == knots[i] & SplitsComp.dat$Method == "mgcv ad"
+  #current.summary <- summary(current.lm)
+  #SplitsComp.dat$AdjRSqr[mask] <- current.summary$r.sq
+  #SplitsComp.dat$PRESS[mask] <- PRESS(current.lm)
+  #SplitsComp.dat$DF[mask] <- current.summary$rank
+  #SplitsComp.dat$DF[mask] <- knots[i] 
+  sum <- 0
+  for(j in 1:dim(SinglePass.dat)[1]) {
+    current.d <- SinglePass.dat[-j,]
+    current.model <- gam(Yield ~ s(Easting,bs="ad",k=knots[i]+4), data=current.d)
+    new.dat <- SinglePass.dat[j,]
+    predicted <- predict(current.model, newdata = new.dat)
+    diff <- predicted - new.dat$Yield
+    sum  <- sum+(diff)^2
+  }
+  SplitsComp.dat$OCV[mask] <- sum/dim(SinglePass.dat)[1]
+}
+```
+
+```{r,include=FALSE}
+# FDA Smoothing
 times_basis = seq(min(SinglePass.dat$Easting),max(SinglePass.dat$Easting),length.out=200)
-knots    = seq(min(SinglePass.dat$Easting),max(SinglePass.dat$Easting),length.out=6) #Location of knots
-n_knots   = length(knots) #Number of knots
-n_order   = 4 # order of basis functions: cubic bspline: order = 3 + 1
-n_basis   = length(knots) + n_order - 2;
-basis = create.bspline.basis(c(min(times_basis),max(times_basis)),n_basis,n_order,knots)
-n_basis
+for(i in 1:length(knots)) {
+  Knots = seq(min(SinglePass.dat$Easting),max(SinglePass.dat$Easting),length.out=knots[i]) #Location of knots
+  n_knots = length(Knots) #Number of knots
+  n_order = 4 # order of basis functions: cubic bspline: order = 3 + 1
+  n_basis = length(Knots) + n_order - 2;
+  basis = create.bspline.basis(c(min(times_basis),max(times_basis)),n_basis,n_order,Knots)
+  single.smooth <- smooth.basis(argvals = SinglePass.dat$Easting, y = SinglePass.dat$Yield, fdParobj = basis)
+  
+  PredictionsFDA.dat$Yield[PredictionsFDA.dat$Knots==knots[i]] = predict(single.smooth)
+  mask <- SplitsComp.dat$Knots == knots[i] & SplitsComp.dat$Method == "fda"
+  #current.summary <- summary(current.lm)
+  #SplitsComp.dat$AdjRSqr[mask] <- current.summary$r.sq
+  #SplitsComp.dat$DF[mask] <- knots[i] #current.summary$edf
+  sum <- 0
+  for(j in 1:dim(SinglePass.dat)[1]) {
+    current.d <- SinglePass.dat[-j,]
+    single.smooth <- smooth.basis(argvals = current.d$Easting, y = current.d$Yield, fdParobj = basis)
+    new.dat <- SinglePass.dat[j,]
+    predicted <- predict(single.smooth, newdata = new.dat[,c('Easting')])
+    diff <- predicted - new.dat$Yield
+    sum  <- sum+(diff)^2
+  }
+  SplitsComp.dat$OCV[mask] <- sum/dim(SinglePass.dat)[1]
+}
+```
 
-single.smooth <- smooth.basis(argvals = SinglePass.dat$Easting, y = SinglePass.dat$Yield, fdParobj = basis)
-plot(single.smooth)
+```{r,include=FALSE,echo=FALSE}
+# BRM Smoothing
+for(i in 1:length(knots)) {
+  k=knots[i]+4
+  current.lm <- brm(Yield ~ s(Easting, k=k), data=SinglePass.dat)
+  PredictionsBRM.dat$Yield[PredictionsBRM.dat$Knots==knots[i]] = predict(current.lm)
+  #mask <- SplitsComp.dat$Knots == knots[i] & SplitsComp.dat$Method == "brm"
+  #current.summary <- summary(current.lm)
+  #SplitsComp.dat$AdjRSqr[mask] <- current.summary$r.sq
+  #SplitsComp.dat$DF[mask] <- knots[i] #current.summary$edf
+  #SplitsComp.dat$GCV[mask] <- current.lm$gcv.ubre
+ # sum <- 0
+#  for(j in 1:dim(SinglePass.dat)[1]) {
+ #   current.d <- SinglePass.dat[-j,]
+#    current.model <- brm(Yield ~ s(Easting, k=knots[i]), data=current.d)
+ #   new.dat <- SinglePass.dat[j,]
+#    predicted <- predict(current.model, newdata = new.dat)
+ #   diff <- predicted - new.dat$Yield
+#    sum  <- sum+(diff)^2
+ # }
+#  SplitsComp.dat$OCV[mask] <- sum/dim(SinglePass.dat)[1]
+}
+```
+<!--
+One measure of the "spread" of the data is given by the sum of squared deviation from the mean, or the corrected sum of squares.
+$$
+SS_{total} = \sum (y(x_j) - \bar{y(x_j)})^2
+$$
+In general, $SS_{total}$ can be decomposed into two components; the variance explained by the function or model $f$ and the residual or error variance. We write these as
+$$
+\begin{aligned}
+SS_{model} &= \sum (f(x_j) - \bar{y(x_j)})^2 \\
+SS_{residual} &= sum (y(x_j) = f(x_j))^2
+\end{aligned}
+$$
+These two quantities combined to equal the total sums of squares, so
+$$
+SS_{total} = SS_{model} + SS_{residual}
+$$
+
+When working with linear models, the ratio of model sum of squares to the total sum of squares is written as
+$$
+r^2 = \frac{SS_{model}}{SS_{total}}
+$$ 
+
+where $r$ is the correlation coefficient. Generally, $r^2$ can be taken as the proportion of total variation of $Y$ that is explained by the function or model.
+
+By itself, $r^2$ is a poor measure for model comparison. $r^2$ will generally increase as the number of parameters in a function $f$ is increased, to the point that if the data contain $n$ data points, a linear model with $n-1$ parameters will result in a perfect fit, with $r^2 = 1$.
+
+Frequently, $r^2$ is adjusted for the number of parameters is incorporated into the calculation of $r^2$. We write
+$$
+r_{adjusted}^2 = 1-\frac{SS_{residual}/(n-p)}{SS_{total}(n-1)}
+$$
+where $p$ is the number of parameter in the model and $n$ is the total number of observations. [@faraway-2000]. 
+
+In the following sections, we will use $r_{adjusted}^2$ for comparing different forms of $f$.
+-->
+
+<!--
+Ordinary or leave-on-out cross validation can be computationally intensive, since it leaves out each data point and fitting a new model for each data point. In strip trials with yield monitor data, the number of data rows can easily be on the order of several thousand data points. A compromise is $k$-fold cross validation. The data are divided into "folds" and for each fold, the data corresponds to the fold is left out of the fit as testing data; the remaining data are used to fit a model. The fitted model from the training data is used to product the observations left out in the test data and the actual observations are compared to the predicted values.
+-->
+
+## Comparising different smoothing functions.
+
+
+The data from Figure \@ref(fig:RawSwath) is used to compare accuracy of interpolation of different smoothing functions, using ordinary cross validation as a scoring function. Wood [@wood-2017] p. 170 defines the ordinary cross validation score
+$$
+\mathcal{V}_0 = \frac{1}{n} \sum_{j=1}^n (\widehat{f}_i^{[-j]} - y_i(x_j))^2
+$$
+as a measure of goodness of fit of a functional representation. The proposed model $f$ is fit to the original data minus a single point $x_j$ and the value predicted by the model fit the to reduced data set $\widehat{f}_i^{[-j]}$ is compared to the observed value $y_i(x_j)$. This process is repeated for each $d_j$ in the original data. This is sometimes referred to as leave-one-out cross validation (LOOCV). This score provides a basis for comparing the ability of different models to interpolate the original data.
+
+
+We use `lm` in R to fit polynomials of degrees `(3,6,12,18,24,30,36)` using the `poly` function as part of the model formula (e.g. `Yield ~ poly(Easting,1)`). Splines are also fit to the data using `lm` in conjunction with `ns` (natural splines) and `bs` (basis splines) from the `splines` library [@perperoglou-2019, @bates-2024], with arguments defining the number of knots `k` in the set `(3,6,12,18,24,30,36)`; we use `ns(df=k+1)` and `bs(df=k+3`. 
+
+We also smooth the data using `gam` from the `mgcv` library [@wood-2017] with `k` in the set `(3,6,12,18,24,30,36)+4`, following the results from \@ref(fig:ComparingSplineFits). We include `mgcv` fits with arguments `bs="bs"`, `bs="ps"` and `bs="ad"` to fit b-splines, p-splines and adaptive splines, respectively. We find that the `bs="ps"` fails for `k+4=7` and `bs="ad"` fails for `k` < 10. 
+
+We also fit using the `brm` function from the `brms` [@burkner-2024] library with `s` argument `k` in the set `(3,6,12,18,24,30,36)`. We do not compute ordinary cross-validation for `brm` due to time constraints; each call to `brm` invokes a C++ compiler call and numerous MCMC iterations. 
+
+We also fit interpolation curves using the `fda` [@ramsay-2009] package. The `fda` package is useful for various forms of functional data analysis and includes interpolating functions. The `fda` package requires more function calls than the other packages considered, First, the user must create an explicit set of points to evaluate the function, plus an explicit vector of knots. After these were created, we called the the `create.bspline.basis` to create a b-spline basis and `smooth.basis` for compute coefficients. We use for the number of knots in the `fda` smooth basis values in `(3,6,12,18,24,30,36)`.
+
+<!--
+For each model fit, we obtain an adjusted $R^2$. This is preferable to unadjusted $R^2$ as a method for comparing the fit of linear and related models because it accounts for the number of terms in the model. The unadjusted $R^2$ increases with each term added to a model, to the point that a model with sufficient parameters can be made to perfectly fit any data. Adjusted $R^2$ also tends to increase with additional model terms, but the increase becomes incrementally smaller with the number of parameters and adjusted $R^2$ can become asymptotic or even decrease with increasing model complexity.
+-->
+
+<!-- The PRESS statistic offers another option for model selection. Briefly, PRESS is a leave-one-out-and-refit methodology that find the error of a model by leaving one element out, one at a time, and measures the prediction error of the left-out element. The PRESS statistic decreases with model complexity, and, similar to adjusted $R^2$, becomes asymptotic as model complexity increases. -->
+
+<!-- 
+$$
+PRESS = \sum_{i=1}^n (y_i - \widehat{y}_{i, -i})^2
+$$
+-->
+
+
+```{r,eval=FALSE,echo=FALSE}
+ggplot(SplitsComp.dat, aes(Knots,AdjRSqr)) + 
+  geom_line(size=1,aes(color=Method)) +
+geom_point(size=3,aes(color=Method,shape=Method)) + 
+scale_colour_manual(values=cbPalette) + 
+labs(colour = "Method", x="Knots", y="Adjusted R Squared", title = "Comparing smoothing methods")
 ```
 
 
+Figure \@ref(fig:SplitsCompOCV) shows the ordinary cross-validation results for a range of selected smoothing functions fit as described above. We see that OCV scores reach a minimum at about 24 knots, while there is a point of dimishing returns at about 12 knots. This suggests our choice of 12 knots for illustration purposes in Figures \@ref(fig:PiecewiseLinear) and \@ref(fig:ComparingSplineFits) is close to an optimal comprimise between smoothness and roughness.
+
+```{r,SplitsCompOCV, fig.cap="Ordinary cross validation for increasing number of knots specified for select smoothing functions", echo=FALSE}
+ggplot(SplitsComp.dat, aes(Knots,OCV)) + 
+  geom_line(size=1,aes(color=Method)) +
+geom_point(size=3,aes(color=Method,shape=Method)) + 
+scale_colour_manual(values=cbPalette) + 
+labs(colour = "Method", x="Knots", y="Ordinary Cross-Validation", title = "Comparing smoothing methods")
+```
+
+We wish to choose a library that uses the `s` syntax to specify a generic smoothing function that defaults to an acceptable degree of smoothing for any arbitrary noisy curve. That is, for automated smoothing of strip trial, we wish to be able to simplify specify R model formula using syntax of the form `Yield ~ s(Easting)` and have some confidence in the appropriate degree of smoothing provided, without being required to compute fit metrics such as ordinary cross-validation for each harvest pass. R functions that support the `s(...)` syntax includes the `gam` from the `mgcv` library  , the `brm` from the `brms` library  and `gam` from the `gam` library. 
+
+Figure \@ref(fig:ComparingSSplines) shows the default smoothing functions `s` from the `mgcv`, `brm` and `gam` libraries. There is little difference between `mgcv` and `brm`, while the default smoother is much more `smooth` for the `gam` function. This is not suprising, given that the `brm` `s` function is largely a wrapper for the `mgcv` `s` function. 
+
+```{r,echo=FALSE,include=FALSE}
+library(gam)
+default.gam <- gam(Yield ~ s(Easting),data=SinglePass.dat)
+GAMDefault <- data.frame(
+  Easting = seq(min(SinglePass.dat$Easting), max(SinglePass.dat$Easting) ,
+                len = length(SinglePass.dat$Yield))
+)
+GAMDefault$Yield <- predict(default.gam, newdata = GAMDefault)
+library(brms)
+default.brm <- brm(Yield ~ s(Easting), data=SinglePass.dat)
+BRMDefault <- data.frame(
+  Easting = seq(min(SinglePass.dat$Easting), max(SinglePass.dat$Easting) ,
+                len = length(SinglePass.dat$Yield))
+)
+BRMDefault$Yield <- predict(default.brm, newdata = BRMDefault)
+```
+
+```{r,include=FALSE}
+#SinglePass.dat$Method = "Original Data"
+#MGCVDefault$Method = "mgcv default"
+GAMDefault$Method = "gam default"
+BRMDefault$Method = "brm default"
+Comparison2.dat <- rbind(SinglePass.dat[,c("Easting","Yield","Method")],
+                         MGCVDefault,
+                         GAMDefault,
+                         BRMDefault)
+Comparison2.dat$Method <- factor(Comparison2.dat$Method,levels=c("Original Data",
+                                                                 "mgcv default",
+                                                                 "gam default",
+                                                                 "brm default"))
+
+```
+
+```{r, ComparingSSplines, fig.cap = "Different implementations of the s() specifier"}
+ggplot(Comparison2.dat, aes(Easting,Yield)) + 
+   geom_line(size=1,aes(color=Method)) +
+   scale_colour_manual(values=cbPalette[1:11])
+```
+
+# Additional Graphs
+
+In Figure \@ref(fig:SplitsCompOCV) we compared the ordinary cross validation scores of different smoothing functions to consider how to choose an optimal number of knots. In the figures that follow we show the results of increasing knots on the wiggliness of the resulting basis functions. In all figures, the original harvest swath data is represented as a gray line in the background.
+
+Figures \@ref(fig:PredictionsNS) and \@ref(fig:PredictionsBS) show more wiggliness at higher numbers of knots than do the curves fit using `mcgv`, `brms` and `fda`. Using `lm`, curves are not penalized; the fit criteria simply minimizes sums of squared deviations.
+
+There is little visual difference in the curves fit using `mgcv` with different spline basis, in Figures \@ref(fig:PredictionsGAM), \@ref(fig:PredictionsGAMBS), \@ref(fig:PredictionsGAMPS) and \@ref(fig:PredictionsGAMAD). The similarity of `mgcv` with `bs='ad'` is somewhat surprising, in light of the results in Figure \@ref(fig:ComparingGAMSplines), where the curve for the default parameters associated with `bs='ad'` was noticeably different than the curves for other spline bases.
+
+Figure \@ref(fig:PredictionsBRM) shows the multiple curves fit using the `brms` package. These curves are qualitatively different than the equivalent curves fit using `mgcv`, even though the `s` function is built upon the `s` function from `mgcv`. `brms` uses Bayesian methodology built upon the `stan` C++ library. Thus, to fit a single curve using `brm` requires additional compile time, along with the time associated with Markov chain Monte Carlo computational engine implemented by `stan`. For this reason, we did not calculate ordinary cross validation scores for the curves in \@ref(fig:PredictionsBRM). The extra computational overhead makes the `brms` library less desirable for fitting multiple harvest passes for strip trial analysis.
+
+The wiggliness of the curves in Figure \@ref(fig:PredictionsFDA) suggest that more steps are required for penalizing function fitting using this library. The `fda` package has powerful tools for working with function data, but does not offer the simplicity of packages like `mgcv` and `brms`.
+
+```{r, PredictionsNS, fig.cap = "Smoothing curves for a single harvest swath using lm with ns, df = K+1", echo=FALSE}
+ggplot(PredictionsNS.dat, aes(Easting,Yield)) + 
+  geom_line(aes(Easting,Yield),size = 0.5, data=SinglePass.dat,color=cbPalette[1]) +
+  geom_line(size=1,aes(color=Knots)) + 
+  scale_colour_manual(values=cbPalette[2:11]) + 
+  labs(colour = "Knots", x="Easting", y="Yield", title = "Single swath, lm ns smoothing")
+```
+
+```{r, PredictionsBS, fig.cap = "Smoothing curves for a single harvest swath using lm with bs, df = Knots+3",echo=FALSE}
+ggplot(PredictionsBS.dat, aes(Easting,Yield)) + 
+  geom_line(aes(Easting,Yield),size = 0.5, data=SinglePass.dat,color=cbPalette[1]) + 
+  geom_line(size=1,aes(color=Knots)) + 
+  scale_colour_manual(values=cbPalette[2:11]) + 
+  labs(colour = "Knots", x="Easting", y="Yield", title = "Single Swath, lm bs smoothing")
+```
+
+```{r,PredictionsGAM, fig.cap = "Smoothing curves for a single harvest swath using mgcv gam with the default smoother, k = Knots+4",echo=FALSE}
+ggplot(PredictionsGAM.dat, aes(Easting,Yield)) + 
+  geom_line(aes(Easting,Yield),size = 0.5, data=SinglePass.dat,color=cbPalette[1]) + 
+  geom_line(size=1,aes(color=Knots)) + 
+  scale_colour_manual(values=cbPalette[2:11]) + 
+  labs(colour = "Knots", x="Easting", y="Yield", title = "Single Swath, mgcv  default smoothing")
+```
+
+```{r,PredictionsGAMBS, fig.cap = "Smoothing curves for a single harvest swath using mgcv gam with the bs='bs' smoother, k = Knots+4", echo=FALSE}
+ggplot(PredictionsGAMBS.dat, aes(Easting,Yield)) + 
+  geom_line(aes(Easting,Yield),size = 0.5, data=SinglePass.dat,color=cbPalette[1]) + 
+  geom_line(size=1,aes(color=Knots)) + 
+  scale_colour_manual(values=cbPalette[2:11]) + 
+  labs(colour = "K", x="Easting", y="Yield", title = "Single Swath, mcgv bs Smoothing")
+```
+
+```{r,PredictionsGAMPS, fig.cap = "Smoothing curves for a single harvest swath using mgcv gam with the bs='ps' smoother, k = Knots+4", echo=FALSE}
+ggplot(PredictionsGAMPS.dat, aes(Easting,Yield)) + 
+  geom_line(aes(Easting,Yield),size = 0.5, data=SinglePass.dat,color=cbPalette[1]) + 
+  geom_line(size=1,aes(color=Knots)) + 
+  scale_colour_manual(values=cbPalette[2:11]) + 
+  labs(colour = "K", x="Easting", y="Yield", title = "Single Swath, mcgv ps Smoothing")
+```
+
+```{r,PredictionsGAMAD, fig.cap = "Smoothing curves for a single harvest swath using mgcv gam with the bs='ad' smoother, k = Knots+4", echo=FALSE}
+ggplot(PredictionsGAMAD.dat, aes(Easting,Yield)) +
+  geom_line(aes(Easting,Yield),size = 0.5, data=SinglePass.dat,color=cbPalette[1]) + 
+  geom_line(size=1,aes(color=Knots)) + 
+  scale_colour_manual(values=cbPalette[2:11]) + 
+  labs(colour = "Knots", x="Easting", y="Yield", title = "Single Swath, mgcv ad smoothing")
+```
+
+```{r, PredictionsBRM, fig.cap = "Smoothing curves for a single harvest swath using brm with the default smoother, k = Knots+4", echo=FALSE}
+ggplot(PredictionsBRM.dat, aes(Easting,Yield)) + 
+  geom_line(aes(Easting,Yield),size = 0.5, data=SinglePass.dat,color=cbPalette[1]) + 
+  geom_line(size=1,aes(color=Knots)) + 
+  scale_colour_manual(values=cbPalette[2:11]) + 
+  labs(colour = "Knots", x="Easting", y="Yield", title = "Single swath, brm smoothing")
+```
+
+```{r,PredictionsFDA, fig.cap = "Smoothing curves for a single harvest swath using fda with create.bspline.basis", echo=FALSE}
+ggplot(PredictionsFDA.dat, aes(Easting,Yield)) + 
+  geom_line(aes(Easting,Yield),size = 0.5, data=SinglePass.dat,color=cbPalette[1]) + 
+  geom_line(size=1,aes(color=Knots)) + 
+  scale_colour_manual(values=cbPalette[2:11]) + 
+  labs(colour = "K", x="Easting", y="Yield", title = "Single Swath, fda Smoothing")
+```
+
+# Conclusions
+
+Spline basis in general seem appropriate for representing a single harvest swath as a function form. Of the R packages considered, the `mgcv` `gam` function offers considerable flexibility combined with relative speed of computations, which are desirable features when considering finding functional representations of harvest passes to be used for further functional data analysis. There is little difference in the choice of spline bases considered, with the exception of the `bs='ad'` option. This option, with the default number of knots, finds more features than the default number of knots associated with other `mgcv` bases considered. 
 
 
 <!-- Required replicates	 -->

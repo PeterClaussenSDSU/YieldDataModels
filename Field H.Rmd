@@ -30,44 +30,58 @@ source('./R/plot.gps.grids.R')
 
 
 ```{r,echo=FALSE}
-corn.2013.dat <- read.csv('~/Work/git/statistics/test_cases/claussen/Stevens East/Stevens East-Corn 2013.csv')
-corn.2013.dat$Yield <- rank(corn.2013.dat$VRYIELDVOL)
+corn.2013.dat <- read.csv('../ManagementZoneML/data/H 2013 Corn Harvest.csv')
+
+corn.2013.dat$Yield <- rank(corn.2013.dat$Yield)
 corn.2013.dat$Yield <- corn.2013.dat$Yield/max(corn.2013.dat$Yield)
+
 corn.2013.dat <- add.metric(corn.2013.dat)
 corn.2013.dat$Swaths <- 7
 corn.2013.dat$SWATHWIDTH <- 5
 
-soybean.2014.dat <- read.csv('~/Work/git/statistics/test_cases/claussen/Stevens East/Stevens East-Soybeans 2014.csv')
-soybean.2014.dat$Yield <- rank(soybean.2014.dat$VRYIELDVOL)
+soybean.2014.dat <- read.csv('../ManagementZoneML/data/H 2014 Soybean Harvest.csv')
+#soybean.2014.dat$Yield <- rank(soybean.2014.dat$VRYIELDVOL)
+
+soybean.2014.dat$Yield <- rank(soybean.2014.dat$Yield)
 soybean.2014.dat$Yield <- soybean.2014.dat$Yield/max(soybean.2014.dat$Yield)
+
 soybean.2014.dat <- add.metric(soybean.2014.dat)
 soybean.2014.dat$Swaths <- 7
 soybean.2014.dat$SWATHWIDTH <- 5
 
-corn.2015.dat <- read.csv('~/Work/git/statistics/test_cases/claussen/Stevens East/Stevens East-Corn 2015.csv')
-corn.2015.dat$Yield <- rank(corn.2015.dat$VRYIELDVOL)
+corn.2015.dat <- read.csv('../ManagementZoneML/data/H 2015 Corn Harvest.csv')
+
+corn.2015.dat$Yield <- rank(corn.2015.dat$Yield)
 corn.2015.dat$Yield <- corn.2015.dat$Yield/max(corn.2015.dat$Yield)
+
 corn.2015.dat <- add.metric(corn.2015.dat)
 corn.2015.dat$Swaths <- 7
 corn.2015.dat$SWATHWIDTH <- 5
 
-soybean.2016.dat <- read.csv('~/Work/git/statistics/test_cases/claussen/Stevens East/Stevens East-Soybeans 2016.csv')
-soybean.2016.dat$Yield <- rank(soybean.2016.dat$VRYIELDVOL)
+soybean.2016.dat <- read.csv('../ManagementZoneML/data/H 2016 Soybean Harvest.csv')
+#soybean.2016.dat$Yield <- rank(soybean.2016.dat$VRYIELDVOL)
+
+soybean.2016.dat$Yield <- rank(soybean.2016.dat$Yield)
 soybean.2016.dat$Yield <- soybean.2016.dat$Yield/max(soybean.2016.dat$Yield)
+
 soybean.2016.dat <- add.metric(soybean.2016.dat)
 soybean.2016.dat$Swaths <- 7
 soybean.2016.dat$SWATHWIDTH <- 5
 
-corn.2017.dat <- read.csv('~/Work/git/statistics/test_cases/claussen/Stevens East/Stevens East-Corn 2017.csv')
-corn.2017.dat$Yield <- rank(corn.2017.dat$VRYIELDVOL)
+corn.2017.dat <- read.csv('../ManagementZoneML/data/H 2017 Corn Harvest.csv')
+#corn.2017.dat$Yield <- rank(corn.2017.dat$VRYIELDVOL)
+corn.2017.dat$Yield <- rank(corn.2017.dat$Yield)
 corn.2017.dat$Yield <- corn.2017.dat$Yield/max(corn.2017.dat$Yield)
+
 corn.2017.dat <- add.metric(corn.2017.dat)
 corn.2017.dat$Swaths <- 7
 corn.2017.dat$SWATHWIDTH <- 5
 
-soybean.2018.dat <- read.csv('~/Work/git/statistics/test_cases/claussen/Stevens East/Stevens East-Soybeans 2018.csv')
-soybean.2018.dat$Yield <- rank(soybean.2018.dat$VRYIELDVOL)
+soybean.2018.dat <- read.csv('../ManagementZoneML/data/H 2018 Soybean Harvest.csv')
+
+soybean.2018.dat$Yield <- rank(soybean.2018.dat$Yield)
 soybean.2018.dat$Yield <- soybean.2018.dat$Yield/max(soybean.2018.dat$Yield)
+
 soybean.2018.dat <- add.metric(soybean.2018.dat)
 soybean.2018.dat$Swaths <- 7
 soybean.2018.dat$SWATHWIDTH <- 5
@@ -83,48 +97,48 @@ combined.dat <- rbind(corn.2013.dat,soybean.2014.dat,corn.2015.dat,soybean.2016.
 ```
 
 ```{r,fig.width=8,fig.height=8,echo=FALSE}
-ggplot(combined.dat, aes(Longitude,Latitude)) + 
+ggplot(combined.dat, aes(Easting,Northing)) + 
 geom_point(aes(colour = Yield),size=1) + 
 scale_colour_gradient2(low=vermillion, mid=yellow, high=blue,midpoint = 0.5) +
 #scale_colour_gradient(low=cbPalette[8], high=cbPalette[5]) +
-labs(colour = "Rank (normalized)", x="X (m)", y="Y (m)") + facet_wrap(~ Year)
+labs(colour = "Rank (normalized)", x="X (m)", y="Y (m)") + facet_wrap(~ Year,nrow=3)
 ```
 
 ### 2013
 
-```{r,fig.width=6,fig.height=8}
+```{r,fig.width=10,fig.height=4}
 plot.gps.grids(corn.2013.dat,plots=0,residuals=TRUE) 
 ```
 
 ### 2014
 
-```{r,fig.width=6,fig.height=8}
+```{r,fig.width=10,fig.height=4}
 plot.gps.grids(soybean.2014.dat,plots=0,residuals=TRUE) 
 ```
 
 
 ### 2015
 
-```{r,fig.width=6,fig.height=8}
+```{r,fig.width=10,fig.height=4}
 plot.gps.grids(corn.2015.dat,plots=0,residuals=TRUE) 
 ```
 
 ### 2016
 
-```{r,fig.width=6,fig.height=8}
+```{r,fig.width=10,fig.height=4}
 plot.gps.grids(soybean.2016.dat,plots=0,residuals=TRUE) 
 ```
 
 ### 2017
 
-```{r,fig.width=6,fig.height=8}
+```{r,fig.width=10,fig.height=4}
 plot.gps.grids(corn.2017.dat,plots=0,residuals=TRUE) 
 ```
 
 ### 2018
 
 
-```{r,fig.width=6,fig.height=8}
+```{r,fig.width=10,fig.height=4}
 plot.gps.grids(soybean.2018.dat,plots=0,residuals=TRUE) 
 ```
 
@@ -139,38 +153,38 @@ plot.gps.grids(soybean.2018.dat,plots=0,residuals=TRUE)
 ```{r}
 
 corn.2013.var <- variogram(Yield~1, 
-                          locations=~Longitude+Latitude,
+                          locations=~Easting+Northing,
                           alpha=c(0,45,90),
                           data=corn.2013.dat)
 plot(corn.2013.var)
 
 
 soybean.2014.var <- variogram(Yield~1, 
-                          locations=~Longitude+Latitude,
+                          locations=~Easting+Northing,
                           alpha=c(0,45,90),
                           data=soybean.2014.dat)
 plot(soybean.2014.var)
 
 corn.2015.var <- variogram(Yield~1, 
-                          locations=~Longitude+Latitude,
+                          locations=~Easting+Northing,
                           alpha=c(0,45,90),
                           data=corn.2015.dat)
 plot(corn.2015.var)
 
 soybean.2016.var <- variogram(Yield~1, 
-                          locations=~Longitude+Latitude,
+                          locations=~Easting+Northing,
                           alpha=c(0,45,90),
                           data=soybean.2016.dat)
 plot(soybean.2016.var)
 
 corn.2017.var <- variogram(Yield~1, 
-                          locations=~Longitude+Latitude,
+                          locations=~Easting+Northing,
                           alpha=c(0,45,90),
                           data=corn.2017.dat)
 plot(corn.2017.var)
 
 soybean.2018.var <- variogram(Yield~1, 
-                          locations=~Longitude+Latitude,
+                          locations=~Easting+Northing,
                           alpha=c(0,45,90),
                           data=soybean.2018.dat)
 plot(soybean.2018.var)

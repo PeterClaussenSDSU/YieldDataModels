@@ -1,0 +1,80 @@
+---
+title: "Strip Trial Time Series"
+author: "Peter Claussen"
+date: "5/4/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+models=12
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(mgcv)
+grey <- "#999999"
+orange <- "#E69F00"
+skyblue <- "#56B4E9"
+bluishgreen <- "#009E73"
+yellow <- "#F0E442"
+blue <- "#0072B2"
+vermillion <- "#D55E00"
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#0072B2", "#D55E00", "#F0E442","#CC79A7","#000000","#734f80", "#2b5a74", "#004f39", "#787221", "#003959", "#6aaf00", "#663cd3")
+```
+
+```{r,include=FALSE}
+source('./R/remove.harvest.outliers.fn.R')
+source('./R/spatial.model.selection.R')
+source('./R/select.best.variogram.R')
+source('./R/spatial.selection.plots.R')
+source('./R/read.yield.data.R')
+source('./R/combined.map.R')
+```
+
+
+```{r,echo=FALSE}
+load(file="~/Work/git/ASA_CSSA_SSSA/2017/Workshop/Case Study 2/Strips.Rda")
+
+EastQuarter.dat$DateTime <- as.POSIXct(EastQuarter.dat$Desc, "%m/%d/%Y %H:%M:%S %p", tz="UTC")
+EastQuarter.dat$Seconds <- EastQuarter.dat$DateTime -EastQuarter.dat$DateTime[1] 
+```
+
+```{r}
+ggplot(EastQuarter.dat, aes(Seconds,Yield)) + 
+geom_point(size=.2,aes(color=Product)) +
+  scale_colour_manual(values=cbPalette) 
+```
+
+
+```{r,include=FALSE}
+treated.2019.dat <- read.csv(file='../ManagementZoneML/data/B 2019 Soybeans Treated.csv')
+left = 1000
+treated.2019.dat <- treated.2019.dat[treated.2019.dat$Longitude >left,]
+treated.2019.dat$Pass <- treated.2019.dat$Block
+treated.2019.dat$Block <- as.factor(ceiling(treated.2019.dat$Pass/2))
+treated.2019.dat$Sprayed <- treated.2019.dat$Pass %in% c(2,4,6,8)
+
+treated.2019.dat$DateTime <- as.POSIXct(treated.2019.dat$Time, "%m/%d/%Y %H:%M:%S %p", tz="UTC")
+treated.2019.dat$Seconds <- treated.2019.dat$DateTime -treated.2019.dat$DateTime[1] 
+```
+
+
+```{r}
+treated.2019.dat <- treated.2019.dat[treated.2019.dat$Yield<80,]
+treated.2019.dat <- treated.2019.dat[treated.2019.dat$Yield>0,]
+```
+
+```{r}
+time.dat <- treated.2019.dat[treated.2019.dat$Seconds > 40000,]
+time.dat <- time.dat[time.dat$Seconds < 80000,]
+ggplot(time.dat, aes(Seconds,Yield)) + 
+geom_point(size=.2,aes(color=Sprayed)) + scale_colour_manual(values=cbPalette) 
+```
+
+
+```{r}
+time.dat <- treated.2019.dat[treated.2019.dat$Seconds > 68000,]
+time.dat <- time.dat[time.dat$Seconds < 69000,]
+ggplot(time.dat, aes(Seconds,Yield)) + 
+geom_point(size=.2,aes(color=Sprayed)) + scale_colour_manual(values=cbPalette) 
+```
+
+It looks like we have too many gaps for this to be analysis cleanly as a time series.

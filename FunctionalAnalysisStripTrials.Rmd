@@ -3,14 +3,14 @@ title: "Functional Data Analysis and Experimental Design for On-farm Strip Trial
 author: "Peter Claussen"
 date: "10/13/2021"
 output:
-  html_document: default
-  pdf_document: default
+  bookdown::html_document2: default
+  bookdown::pdf_document2: default
 bibliography: biblio.bib
 ---
 
 <!-- See ASA_CSSA_SSSA/2018/ThoughtsAboutPower -->
 
-```{r,echo=FALSE}
+```{r,echo=FALSE,include=FALSE}
 library(splines)
 library(ggplot2)
 library(gridExtra)
@@ -28,94 +28,138 @@ pair.colors <- c(2,5)
 ```
 # Introduction
 
-Collaborative research between agronomists and farmers has a long history, but recent technological 
-advances has greatly increased opportunities for on-farm research. For our purposes, we will define 
-on-farm research as comparative experiments 1) conducted on farmer-owned fields, 2) treatments applied 
-using farmer-owned equipment and 3) data collected using farmer-owned harvesters. 3) implies the use 
-of GPS-enabled yield data monitors, while 2) and 3) determine the nature of experimental units. 
-Specifically, the dimensions of the experimental units will be determined by the width of farm implements 
-and by the length of a typical planting, application or harvest pass.
+Collaborative research between agronomists and farmers has a long history [@doerge-07-1999, @riley-03-2001, @agriculture-2024], but precision agriculture (PA) technologies have greatly increased opportunities for on-farm research (for example, [@lawes.r-03-2012, @taylor-08-2011]) . Many types of on-farm participatory trials have been explored over the past several decades [@riley-03-2001,@kyveryga-11-2019]. 
 
-We will consider a ‘pass’ as a simple complete farming operation, e.g. the interval between when a planter 
-is lowered into the soil at one end of the field to when the planter is raised at the other end of the field. 
-As such, each pass may be thought of in terms of a traditional plot, albeit a very long and very thin plot. 
-However, a very long and very thin rectangle becomes increasingly similar to a single line, and we can easily 
-model yield as function of position on this line. Thus, the analysis of yield monitor data is a likely candidate 
-for functional data analysis.
+
+In particular, we are interested in collaborative trials that are largely conducted by the farmer, independent of researcher intervention. In such cases, farmers are given a sample of a new technology - crop varieties, pesticides, etc - and encouraged to apply the new technology to a small portion of their acreage to demonstrate the effectiveness of the new technology. The farmer benefits by being able to see for himself the effectiveness (or lack thereof) of the new technology, while the researcher benefits from being able to pool the results from multiple collaborators. 
+
+
+In this paper, we propose methods specifically to analyze single on-farm strip trials [@hicks-1997, @kyveryga-06-2018, @network-2023]. On-farm strip trials can have an advantage over more traditional small plot trials with respect to statistical power in detecting differences among certain kinds of treatments [@kandel-2018, @li-09-2022,@laurent-2022]. Our ultimate goal is to provide a presentation of the results of a strip trial to collaborators that can provide some statistical support to answer the question "Did the new product work well enough in the strip trial for the collaborator to adopt the new technology for application to a larger percent of his total acreage?"
+
+For our purposes, we will define on-farm research as comparative experiments such that
+
+1. trials are conducted on farmer-managed crop-lands
+2. treatments are applied using farmer-owned equipment  
+3. data is collected using farmer-owned harvesters. 
+
+We will use the term crop-land for an area of ground planted and harvested by a farmer. The term "field" is more commonly used, but we will also be discussing mathematical entities known as "random fields", so we will be using "field" to imply the latter context, and "crop-land" for the former.
+
+Further, items 2) and 3) imply the use of GPS-enabled technology to record placement of experimental treatments and the corresponding crop yields, 2) determines the size of the experimental unit, while 3) determines the size of the observational unit. Specifically, the dimensions of the experimental units will be determined by the width of farm implements used to apply treatment and by the length of a typical application pass. In many cases, the width of the application implement is greater than the width of the harvester, so there may be multiple harvest passes per application pass. 
+
+We will consider a ‘pass’ as a simple complete farming operation, e.g. the interval between when a planter is lowered into the soil at one end of the field to when the planter is raised at the other end of the field, when a sprayer starts spraying at one of the field and continues to the opposite end of the field, or when a harvester enters unharvested crop at one end of the field and continues in a roughly linear motion to the opposite end. Because of differences in planter and harvester widths, there may be multiple harvester passes per planter or sprayer pass.
+
+In practice, a pass as analyzed may be trimmed to exclude the end-of-row headlands, which may include overlapping applications [@bullock-11-2019]. Strips should also ideally be applied to inner rows only to avoid side of field effects [@bullock-11-2019].
+
+Each pass may be thought of in terms of a traditional plot, albeit a very long and very thin plot. 
+However, a very long and very thin rectangle becomes increasingly similar to a single line, and we can easily model yield as function of position on this line. Thus, the analysis of yield monitor data from strip trials is a likely candidate 
+for functional data analysis. 
+
+We recognize that there is inherent spatial variability in the accuracy of yield monitors [@gauci-12-2023], but an appropriate choice of interpolation of yield points can minimize point-to-point variability.
+
+
+Strictly speaking, on-farm strip trials do no necessarily require the use of GPS enabled harvesters. In the past, weigh wagons have been used to measure yield of strips in on-farm participatory testing - [@yan-03-2002] - for example. However, this method of determine strip yield is not suitable to analysis as functional data; while such methods have been in common use and are valid in context, we will ignore such experiments for our proposed analysis. We also recognize that some on-farm experiment can be conducted as single strips; this method requires multiple strips. Other methods have been proposed for the analysis of single-strip trials [@cho-2021]
+
 
 ## Univariate Data Analysis
 
-To introduce functional data analysis, we start with a simple strip trial for variety testing. We will show 
-how a simple univariate analysis - independent means t-test - is extended to an analysis of functional data.
+To introduce functional data analysis, we start with a simple strip trial for variety testing (Example 1). We will show how a simple univariate analysis is extended to an analysis of functional data.
+ 
+First, assume we have $N_1$ treated strips and $N_2$ untreated strips. We pooled all yield monitor data points associated with a single string by simple averaging. Thus, if a strip has $k=1,\cdots,K$ total yield monitor points, then
 
+\begin{equation}
+y_{ij} = \frac{\sum_{k=1}^{K_{ij}} y_{ijk}}{K_{ij}}
+\end{equation}
 
+We model yield data points as subsamples, so $y_{ij}$ represents a plot mean.
 
-We will further simplify the analysis by modeling the experiment as an a comparison of two means with pooled 
-standard deviation, using a simple t-test. Write the statistical model as
+We will further simplify the analysis by modeling the experiment as an a comparison of two means with pooled  standard deviation, whih we will refer to as the univariate analysis. We write the statistical model as
 
-$$
+\begin{equation}
 y_{ij} = \mu_i + e_{ij}
-$$
+\end{equation}
+where $i = 1, \cdots, I$ is the number of treatments and $j = 1, \cdots, J$ are the number of observations per treatment group.
 
-Let
+We limit this analysis to the case where treated strips are paired with untreated strips. This suggests a paired comparison $t$ test, where we calculate the $j^{th}$ paired difference as
+\begin{equation}
+d_j = y_{1j} - y_{2j}
+\end{equation}
+where $y_{1j}$ and $y_{2j}$ are individual strip yield estimates for the $j^{th}$ pair of strips. 
+<!--We pair strips moving from south to north, so $y_{1j}$ corresponds to the southern most strip of a pair.-->
+
+Let $\bar{d} = \frac{1}{n} \sum_{j=1}^n d_j$, then the $t$ statistic takes the form
+\begin{equation}
+t_0 = \frac{\bar{d}}{S_d/\sqrt{n}}
+\end{equation}
+where $n$ is the number of pairs and
+\begin{equation}
+S_d = \sqrt{\frac{\sum_{j=1}^n (d_j - \bar{d})^2}{n-1}}
+\end{equation}
+
+<!--We can then test this hypothesis with a two independent sample $t$ test [@montgomery-2019] of the form
 
 $$
-t = \frac{\widehat{\delta}}{\sqrt{2 \widehat{\sigma}^2 / n}}
+t_0 = \frac{\bar{y}_1 - \bar{y}_2}{S_p \sqrt{\frac{1}{N_1}+\frac{1}{N_2}}}
 $$
-where
+where $\bar{y}_1$ and $\bar{y}_2$ are sample means with $N_1$ and $N_2$ observations per mean. $S_p$ is a pooled standard deviation given by
 
 $$
-\begin{aligned}
-\widehat{\mu}_i & = \frac{\sum_{j=1}^{N_i} y_{ij}}{N_i} \\
-\widehat{\sigma}^2 & = \frac{\sum_{j=1}^{N} (y_{ij}-\widehat{\mu}_i)^2}{N - k} \\
-\widehat{\delta} & = \widehat{\mu}_i-\widehat{\mu}_j
-\end{aligned}
+S_p = \sqrt{\frac{{(N_1-1)S_1^2 + (N_2 -1) S_2^2}}{N_1 + N_2 -2}}
 $$
+where $S_1^2$ and $S_2^2$ are the sample variances associated with each mean, given by
 
-Then for this example (Table 1), t = 2.35 and p(t)=0.04.
+$$
+S_i^2 = \frac{\sum_{j=1}^{N_{i}} (y_{ij} - \bar{y}_i )^2}{N_i-1}
+$$
+for $i = 1,2$.-->
+
+Table ## summarizes the formula use for a univariate analysis of the data.
 
 ## Functional Data Analysis
 To extend the univariate analysis to a functional analysis, we first need to model the experimental unit as a function over some variable; preferably a variable that allows us to compare equivalent subsamples from each unit. In this case, we want to compare different strips at equivalent positions in the field; in other cases, we may wish to compare measurements made at equivalent time intervals or growth stages.
 
-$$
-y_{ij}(d) = \text{Yield at distance } d
-$$
-when the field is approximately rectangular and distance can be measured from a fixed side (i.e. the eastern edge of the harvest area).
+\begin{eauation}
+y_{i}(x) = \text{Yield at distance } x
+\end{equation}
 
-Then each formula from # has a functional equivalent (Table 2). Letting a line running perpendicular to the main axis of the strips, at one side of the field, represent the origin, (#) provides an estimate of yield at any distance d from the origin.  
+when the field is approximately rectangular and distance can be measured from a fixed side (i.e. the eastern edge of the harvest area). 
+
+Then each formula from in the preceding section has a functional equivalent (Table 2). Letting a line running perpendicular to the main axis of the strips, at one side of the field, represent the origin, (#) provides an estimate of yield at any distance $x$ from the origin.  For simplicity, we analyze data from fields such that strips have been planted in nearly east-west or north-south orientations  that is, parallel to either latitudinal or longitudinal lines. This simplifies the analysis by allow us to use GPS estimates of latitude or longitude directly, without need to convert coordinates to distances from an origin using trigonometrics.
+
 
 ## Functional Forms for Functional Data
-Consider each strip as an independent experimental unit, denoted $Y_i$. Where it is necessary to discuss multiple strips in the same context, we will use $Y_1, \dots, Y_k$ to denote $k$ strips. Further, we will denote a specific observation from strip $Y_i$ at the distance $d$ as $Y_i(d)$, thus denoting the specific observation as a function of distance.
+Consider each strip as an independent experimental unit, denoted $y_i$. Where it is necessary to discuss multiple strips in the same context, we will use $y_1, \dots, y_k$ to denote $k$ strips. Further, we will denote a specific observation from strip $y_i$ at the distance $x$ as $t_i(x)$, thus denoting the specific observation as a function of distance.
 
-In general, $Y(d)$ will take a functional form, with as associated measurement error
+In general, $y_i(x)$ will take a functional form, with as associated measurement error
 
 $$
-Y_i(d) = \mathbf{A_i}{\mathbf{\theta}} + f_i(d) + \mathbf{e}(d)
+y_i(x) = f_i(x) + \mathbf{e}(x)
 $$
 
 Choosing an appropriate function $f$ is part of the art of functional analysis. The choice of function is largely going to depend on the relative importance placed on two components of the functional form - smoothing and interpolation.
 
 Functional data are in theory continuous values, but data are commonly collected at discrete intervals, and measurement errors occur during when functions are sampled. Smoothing occurs when functional forms are chosen to minimize variance between the function values at sample points and the sampled values.
 
-Discrete functional data units are frequently cannot be sampled at identical independent values (i.d. the same $d$). Instead, values at non-sampled d are inferred from sample points $Y(d)$ by a process of interpolation. The number of sampled points used for each interpolated value characterizes the choice of functional forms.
+Discrete functional data units frequently cannot be sampled at identical independent values (i.e. the same $x$). Instead, values at non-sampled $x$ are inferred from sample points $y(x)$ by a process of interpolation. The number of sampled points used for each interpolated value characterizes the choice of functional forms.
 
 
-A generalized additive model following from our previous examples may take the form (adapted from )
+A generalized additive model following from our previous examples may take the form (adapted from [@wood-2017] )
 
 $$
 g(y_i) = \mathbf{A_i} \mathbf{\theta} + f(x_{1i}) +f(x_{2i},x_{3i}) + e_i
 $$
 where $\mathbf{A_i} \mathbf{\theta}$ are the strictly parametric components of the model and  $f(\circ)$ is a function form of the covariate $x_1, \dots $. In the functional analysis of strip trials, $\mathbf{A_i} \mathbf{\theta}$ would represent the treatment structure while $f(x_{1i})$ represents a smooth function of yield over distance.
 
-In this case, we can assume $g(y_i)=y_i$ and $\mathbf{A_i} \mathbf{\theta} = \mu_i$, so this simplifies to a linear model with respect to the smoothing function. We will use distance from the west end of the field as covariate $\delta = x_1$
+In this case, we can assume $g(y_i)=y_i$ and $\mathbf{A_i} \mathbf{\theta} = \mu_i$, so this simplifies to a linear model with respect to the smoothing function. We will use distance from the a fixed end of the field as covariate $x = x_1$
 
 $$
-y_i = f(\delta) + e_i
+y_i = f(x) + e_i
 $$
 
-## Forms of $f(\delta)$
+## Forms of $f(x)$
 
-The choice of $f(\delta)$ depends largely on a smoothing parameter $\lambda$ that determines how 'smooth' or 'wiggly' the resulting interpolating function fits the data. Too smooth and the data are underfit, loosing information, but too wiggly and the data are overfit, including too much error variance in the model. We use the R library `mgcv` to perform generalized cross-validation (Generalized Additive Models, p 169) of the fitted function $f(\delta)$ to obtain an appropriately smooth $f(\delta)$. Fitted values are then taken as the true yield at point $\delta$, and this value is used to compute summary statistics for functional data analysis.
+The choice of $f(x)$ depends largely on a smoothing parameter $\lambda$ that determines how 'smooth' or 'wiggly' the resulting interpolating function fits the data. Too smooth and the data are under fit, losing information. If the fit is too rough and the data are over fit, including too much error variance in the model. We use the R library `mgcv` to perform generalized cross-validation ([@wood-2017], p 169) of the fitted function $f_i(x)$ to obtain an appropriately smooth $f_i(x)$. Fitted values are then taken as the true yield at point $\delta$, and this value is used to compute summary statistics for functional data analysis. 
+
+`mgcv` is an attractive package to use for these analysis. This package is a standard part of the of R installation, and thus can be considered stable. The driver function `gam` provides automatic smoother estimation (`s` in `mgcv` notation), although it is relatively easy to fine-tune smoothing parameters. [@perperoglou-2019]. The automatic nature of smoother selection is of importance to analysis of strip trial data - strips trial themselves may consist of several individual measurement units (i.e. harvest passes) and it is not always practical to write code to optimize each measurement unit, particularly if there are multiple trials to be analyzed in a short period of time. `mgcv` also has options to smooth in two dimensions, which will be of use later when we consider analysis of problematic strip trials.
 
 <!-- ## Extension to Power Analysis -->
 
@@ -141,45 +185,82 @@ The choice of $f(\delta)$ depends largely on a smoothing parameter $\lambda$ tha
 <!-- Frequently, the number of required replicates will be calculated for a range of effect sizes, and effect size will be calculated for a range of practical replicates. These formula have functional forms that follow from the functional t statistic (Table #) -->
 
 
-## Functional Omnibus Test
-
-Suppose we wish to have an omnibus test of significance for treatment effect, independent of position - that is, a main treatment effect as opposed to a treatment by position interaction effect. The traditional analysis of variance would test the mean squares of treatment means over strips against residual error. 
-
 # Materials and Methods
+## General Overview of Yield Monitor Data
+
+Yield is recorded in units of bushels per acre, but this requires the use of several sensors in the harvester [@whelan-2013, @luck-2014]. Grain flow sensors measure the rate at which grain moves within the harvester. Typically, there are two types of sensors in used; impact-type which measures the force of grain hitting a metal plate connected to a strain gauge or potentiometer, and volumetric-type sensors which measure the volume of grain as it is lifted inside the harvester in an elevator. Flow rate is typically recorded at one second intervals as in our example data.
+
+Yield in bushels per acre is usually standardized to a specific grain moisture content, so to properly record yield, harvesters are equipped with grain moisture sensors. There are many types of moisture sensors, but in general, grain moisture is not sampled at the same rate as grain flow; in our example data, moisture measurements are taken at 10-15 second intervals. Moisture is typically reported as a percent water. Yield flow rate volumes are recorded as "wet" weight, and yield monitor software uses to covert grain flow to a standardized "dry" weight.
+
+Harvesters are equipped with ground speed sensors, which measure the speed of the harvester as it travels through the standing crops. This, combined with swath width or cut width (meters or feet, depending on the specific yield monitor), is used by yield monitor software to convert grain flow in weight per second to weight per area, resulting in a dry yield volume. Yield is converted according to the following formula  [@luck-2014] :
+
+$$
+Yield \left( \frac{bushels}{acre} \right) = 43560 \left( \frac{m \times t}{d \times w \times p} \right) \left( \frac{100-MC_{harvest}}{100-MC_{market}} \right)
+$$
+
+where
+
+- $m$ = mass flow rate ($lb/sec$)
+- $t$ = logging interval of the yield monitoring system ($sec$)
+- $d$ = distance traveled between logged data points ($ft$)
+- $w$ = header cut width setting ($ft$)
+- $p$ = grain density or test weight ($lb/bu$)
+- $MC_{harvest}$ = moisture content from yield monitor sensor (wet weight) ($\%$)
+- $MC_{market}$ = marketable moisture content (dry weight) ($\%$)
+- $43560$ = conversion from $ft^2$ to acres.
+
+
+Yield is mapped to specific geographic coordinates through GPS sensors, which associated a longitude and latitude with each recorded grain flow data point. There is a lag between the time the grain enters the combine and when the grain reaches the grain flow sensor; it is usually possible for operators to adjust lag time to improve the accuracy of GPS coordinates associated with yield points. 
+
+Different yield monitor manufacturers use different native file formats for GPS-tagged yield data. Ag Leader SMS software [@agleader] was used to convert the native data from Example 1 to GIS shapefile; the yield data for Example 2 was exported to GIS shapefile format from John Deere Operations Center [@myjohndeere]. 
+
+Shapefiles were read into QGIS [@qgis] then exported to CSV format to be imported into R [@r-core]. Unless otherwise stated, all data manipulation and statistical analysis were performed using R. Before statistical analysis, the data were anonymized converting GPS coordinates, which can be used to identify the specific collaborators field, to distance in meters from an origin point. The origin was found by subtracting the minimum latitude or longitude in corresponding data columns from each of the coordinates associated with a yield data point. 
+
+Units in GPS were converted to meters using the R function 
+```{r,eval=FALSE}
+add.metric <- function(data, origin=c(NA,NA)) {
+  #adapted from https://stackoverflow.com/questions/639695/how-to-convert-latitude-or-longitude-to-meters
+  if(any(is.na(origin))) {
+    origin[1] <- min(data$X)
+    origin[2] <- min(data$Y)
+  }
+  data$Easting <- data$X - origin[1]
+  data$Northing <- data$Y - origin[2]
+  latMid <- (min(data$Y) + max(data$Y))/2
+  m_per_deg_lat = 111132.954 - 559.822 * cos( 2.0 * latMid ) + 1.175 * cos( 4.0 * latMid)
+  m_per_deg_lon = (3.14159265359/180 ) * 6367449 * cos ( latMid )
+  data$Easting <- data$Easting*m_per_deg_lon
+  data$Northing <- data$Northing*m_per_deg_lat
+  return(data)
+}
+```
+
+The final version of the data include three columns that are of interest for the proposed analysis:
+`Easting` as the number of meters from the lower left (southwest) corner in an easterly direction of the cropland where the grain was harvested, `Northing` as the number of meters in a northerly direction, and `Yield`, which is yield in bushels per acre, renamed from the original data; this was done to make analysis consistent across yield data providers.
 
 ## Example 1
 
 In this experiment, two varieties were tested using a split-planter comparison method [@doerge-07-1999].
-Two varieties were assigned to the left and to they right half of a standard corn planter. Seed was harvested 
-with a GSP enabled combined, with the width of the harvester one-half the planter width. Twelve passes 
-were planted, representing two planted strips, and 24 passes were harvested. The length of each harvest pass was approximately 400m. Portions of the harvest and yield maps are shown in Figure #.
+Two varieties were assigned to the left and to they right half of a standard corn planter. Variety names were entered in the original data as `Product`, these were anonymized to letters "B" and "E" - this was part of a larger strip trial with additional test varieties.
 
-Each harvest pass was smoothed in R using the `gam` function from the `mgcv` library by first fitting yield values to distance from the west edge of the field, using code of the form `gam(Yield ~ s(Easting),...)`. The fitted model was used to predict yield on a common distance basis of values from 2 to 398 (Figure #). Since each harvest pass represents half of a planter pass, two harvest passes were merged by taking the average of the two passes at each distance point to form a single strip (Figure #). This provided 12 experimental units with two treatments and six replicates for functional data analysis.
+Grain was harvested  with a GSP enabled combined, with the width of the harvester one-half the planter width. Twelve passes  were planted, representing two planted strips, and 24 passes were harvested. The data were trimmed to excluded head rows and side rows to improve uniformity of the strips. The length of each harvest pass was approximately 400m. Portions of the harvest and yield maps are shown in Figure \@ref(fig:EastQuarterMaps). The data were not screened from outliers, since the endrows and edgerows were removed from the analysis.
 
-It should be noted that this is a simplification of the design. 
+As show in Table ##, the strips deviate from a straight east-west line by less than 8 meters (the maximum Northing value minus the minimum Northing value), For this analysis, we simplify and use the variable `Easting` to represent $d$.
 
+Each harvest pass was smoothed in R using the `gam` function from the `mgcv` library by first fitting yield values to distance from the west edge of the field, using code of the form `gam(Yield ~ s(Easting),...)`. The original data are shown in Figure \@ref{fig:EastQuarterActualYield}.. The fitted model was used to predict yield on a common basis of $[2,4,\dots, 398]$ measured in meters from the western edge of the field. (Figure \@ref{fig:EastQuarterHarvestPasses}. Since each harvest pass represents half of a planter pass, two harvest passes were merged by taking the average of the two passes at each distance point to form a single strip (Figure \@ref{fig:EastQuarterAnalyzedPasses}. This provided 12 experimental units with two treatments and six replicates for functional data analysis. Variety means and standard deviations where computed for each point in the common basis. From this, paired comparison $t$-statistics and $p$-values were computed and plotted (Figure \@ref(fig:ResultsExample1)).
 
+<!--From Table #, a pointwise functional t-test follows as illustrated in Figure #. First, smoothing functions are found for each harvest pass. Two harvest are combined into single experimental units by taking the average of two interpolated yield estimates for each distance value in the common distance basis (${2,4,\dots, 398}$). This resulted in a collection of observations, with six strips per variety. -->
 
-From Table #, the functional t-test follows as illustrated in Figure #. Briefly, for each distance value in the common distance basis (${2,4,\dots, 398}$) means, standard deviations, $t$-statistics and $p$-values were computed and plotted (Figure #).
 
 # Example 2
 
-The second example is a fungicide trial where the farmer was instructed to spray a fungicidal treatment in alternating strips in a field of his choosing; the number and location of strips was also chosen by the farmer. In this case, the farmer started spraying at the gate leading into the field and moved to the east with each spray pass. The sprayer boom covered the width of four harvest passes, so each treated strip consisted of four harvest pass samples. Spray and harvest maps are show in Figure #.
+The second example is a fungicide trial where the collaborator was instructed to spray a fungicidal treatment in alternating strips in a field of his choosing; the number and location of strips was also chosen by the farmer. In this case, the collaborator started spraying at the gate leading into the field and moved to the east with each spray pass. The sprayer boom covered the width of four harvest passes, so each treated strip consisted of four harvest pass samples. Spray and harvest maps are show in Figure #. The harvest shape files were edited in QGIS, first by superimposing the spray plan layer, then tagging individual yield points as sprayed (`TRUE`) or unsprayed (`FALSE`). Endrows and yield data in non-experimental parts of the field are shown in Figure \@ref(fig:Example2SprayYieldMaps), but were trimmed for functional data analysis, so that only pairs of sprayed/unsprayed strips were retained. The western most strip of each pair was untreated, while the easternmost strip of each pair was sprayed. This excluded the far eastern edge row from the analysis.
 
-The field contained several incipent wetlands that could not be planted; instead buffer rows were planted and harvested around each wetland (as shown by gaps in the yield map). Harvest values from these buffer rows were included in the yield associated with harvest strips, but may introduce error in yield estimates for some locations in the strips.
+The field contained several incipient wetlands that could not be planted; instead buffer rows were planted and harvested around each wetland (as shown by gaps in the yield map). Harvest values from these buffer rows were included in the yield associated with harvest strips, but may introduce error in yield estimates for some locations in the strips. The dataw were screened to remove outliers; yield values were limited to $>0$ and $<80$
 
-gam smoothing models were fit to yield values for each harvest pass (Figure #), then the predicted values for each harvest pass were averaged to provide an estimate of yield for each treated strip (Figure #). The field was not a uniform rectangle, so some treated strips are longer than others. 
+Figure \@ref(fig:FungicideActualYield) shows the yield monitor harvest estimates for Example 2. Note that there are many low or zero values; this emphasizes the harvest gaps found in these data. `gam` smoothing models were fit to yield values for each harvest pass (Figure \@ref(fig:AndersonsHarvestStrips)). The interpolated values for each harvest pass were averaged to provide an estimate of yield for each treated strip, with four harvest passes combined for each sprayed strip. (Figure @\ref(fig:FungicideAnalyzedPasses)). The field was not a uniform rectangle, so some treated strips are longer than others. 
 
-Treatment differences, standard deviations, t-statistics and p-values were calculated as described in the previous section, with the exception that the number of strips was also computed at each distance. The distance basis was measured from the south end of the field.
-
-# Results
-
-## Example 1
-As shown in Figure #, the difference between treatment means is presented a continuous function of distance $d$ from the western edge of the field. In this example the difference is greatest in the eastern half of the field. Standard deviation also varies with position, but is greater in the western part of the field. Since $t$ is a function of both difference and standard deviation (in this example, replicates are constant across the field) the test of significance also varies with position and the p-value associated with this test is more often significant in the western part of the field.
-
-We should note that the largest region of significant differences between varieties occurs in a higher yield part of the field; the differences in low fertility zones are smaller and not statistically significant. This provides information about the physical cause of varietal differences. We might infer from this that variety # is a superior performer in high-yield zones, but still performs well in low-yield zones.
-
-## Example 2
+Since the strips are of unequal lengths, we do not provide strip level summary statistics as in Example 1. Functional forms of treatment differences, standard deviations, t-statistics and p-values were calculated as described in the previous section, with the exception that the number of strips was also computed at each distance. The distance basis from $42,44,\cdots, 744$, was measured from the south end of the field. The southern most end-rows were not included in the analysis.
 
 
 
@@ -213,7 +294,7 @@ ggplot(EastQuarter.dat, aes(Easting,Northing)) +
 ```
 
 
-```{r,EastQuarterMaps,echo=FALSE,fig.width=8,fig.height=6}
+```{r,EastQuarterMaps,echo=FALSE,fig.cap = "Seeding and yield monitor harvest maps for Example 1", fig.width=8,fig.height=6}
 grid.arrange(
   arrangeGrob(
         ggplot(EastQuarter.dat, aes(Easting,Northing)) + 
@@ -234,19 +315,30 @@ means.dat <- with(EastQuarter.dat, data.frame(
   Pass = aggregate(Yield ~ Pair,EastQuarter.dat,mean,na.rm=TRUE)[,1],
   Yield = aggregate(Yield ~ Pair,EastQuarter.dat,mean,na.rm=TRUE)[,2],
   Product = aggregate(as.numeric(Product) ~ Pair,EastQuarter.dat,mean,na.rm=TRUE)[,2],
-  Northing = aggregate(Northing ~ Pair,EastQuarter.dat,mean,na.rm=TRUE)[,2]
+  Northing = aggregate(Northing ~ Pair,EastQuarter.dat,mean,na.rm=TRUE)[,2],
+  MinNorth = aggregate(Northing ~ Pair,EastQuarter.dat,min,na.rm=TRUE)[,2],
+  MaxNorth = aggregate(Northing ~ Pair,EastQuarter.dat,max,na.rm=TRUE)[,2],
+  MinEasting = aggregate(Easting ~ Pair,EastQuarter.dat,min,na.rm=TRUE)[,2],
+  MaxEasting = aggregate(Easting ~ Pair,EastQuarter.dat,max,na.rm=TRUE)[,2]
 ))
-means.dat
 means.dat$Product <- levels(EastQuarter.dat$Product)[means.dat$Product]
+means.dat$StripLength <-means.dat$MaxEasting - means.dat$MinEasting
+
+MeansB <- means.dat[means.dat$Product=="B",]
+MeansE <- means.dat[means.dat$Product=="E",]
+Differences <- MeansB$Yield - MeansE$Yield
+d <- mean(Differences)
+S <- sd(Differences)
+n <- length(Differences)
+t0 <- d/(S *(sqrt(1/n)))
+prt <- 2*(1-pt(t0, n-1))
+#means <- tapply(means.dat$Yield, means.dat$Product, mean)
+#sds <- tapply(means.dat$Yield, means.dat$Product, sd)
+#ns <- tapply(means.dat$Yield, means.dat$Product, length)
+#Sp <- sqrt(((ns[1] - 1)*sds[1]^2 + (ns[2]-1)*sds[2]^2)/(ns[1]+ns[2]-2))
+#t0 = (means[1] - means[2]) /(Sp *(sqrt(1/ns[1]+1/ns[2])))
+#prt <- 2*(1-pt(t0, ns[1]+ns[2]-2))
 ```
-
-
-```{r,echo=FALSE,fig.width=8,fig.height=3}
-ggplot(means.dat, aes(x=Northing, y=Yield, color=Product,fill=Product)) +
-  geom_bar(stat="identity") + scale_colour_manual(values=cbPalette[pair.colors]) + scale_fill_manual(values=cbPalette[pair.colors])
-```
-
-
 
 ```{r,echo=FALSE}
 smooth.basis <- rep(seq(2,398,by=2))
@@ -262,7 +354,10 @@ Smoothed.dat <- data.frame(
 for(i in 1:total.passes) {
   current.pass <- EastQuarter.dat[EastQuarter.dat$PassNo==i,]
   #current.loess <- loess(Yield ~ Easting,data=current.pass)
+  #current.gam <- gam(Yield ~ s(Easting,bs="cr"),data=current.pass)
+  #current.gam <- gam(Yield ~ s(Easting,bs="ps",k=30),data=current.pass)
   current.gam <- gam(Yield ~ s(Easting),data=current.pass)
+  #current.gam <- gam(Yield ~ s(Easting,bs="ad"),data=current.pass)
   #current.smoothed <- predict(current.loess, data.frame(Easting = smooth.basis))
   current.smoothed <- predict(current.gam, data.frame(Easting = smooth.basis))
   Smoothed.dat$Yield[Smoothed.dat$PassNo==i] <- current.smoothed
@@ -280,7 +375,7 @@ Aggregated.dat <- aggregate(Yield ~ Easting + Product + Pair,FUN=mean, data=Smoo
 #Aggregated.dat$Product <- levels(EastQuarter.dat$Product)[Aggregated.dat$Product]
 ```
 
-```{r}
+```{r,echo=FALSE}
 EQpooled.dat <- EastQuarter.dat[,c('Easting','Yield','Product')]
 EQpooled.dat$Source <- 'As Harvested'
 Smoothed.dat$Source <- 'GAM Predicted by Harvest Pass'
@@ -289,7 +384,7 @@ Aggregated.dat$Source <- 'Yield aggregated by strip'
 EQpooled.dat <- rbind(EQpooled.dat,Aggregated.dat[c('Easting','Yield','Product','Source')])
 ```
 
-```{r,ECombinedVarietyPlot,echo=FALSE,fig.width=8,fig.height=9}
+```{r,ECombinedVarietyPlot,eval=FALSE, fig.cap="Original yield data points, interpolating functions for harvest strips and averaged smooth functions for functional experimental units", echo=FALSE,fig.width=8,fig.height=9}
 ggplot(EQpooled.dat, aes(Easting,Yield)) + 
 geom_point(aes(colour = Product),size=.2) + 
 scale_colour_manual(values=cbPalette[pair.colors]) + 
@@ -299,78 +394,44 @@ labs(colour = "Variety", x="Easting", y="Yield", title = "Variety Trial, Smoothi
 ```
 
 
-```{r,EastQuarterActualYield,eval=FALSE,echo=FALSE,fig.width=8,fig.height=3}
+```{r,EastQuarterActualYield,fig.cap = "Raw yield monitor estimates for the harvest strips in Example 1",echo=FALSE,fig.width=8,fig.height=3}
 ggplot(EastQuarter.dat, aes(Easting,Yield)) + 
-geom_point(aes(colour = Product),size=.2) + 
+#geom_point(aes(colour = Product),size=.2) + 
+geom_line(aes(colour = Product),size=.2) + 
 scale_colour_manual(values=cbPalette[pair.colors]) + 
-labs(colour = "Variety", x="Easting", y="Yield", title = "East Quarter, as Harvested") +
-  ylim(100, 240)
+labs(colour = "Variety", x="Easting", y="Yield", title = "Example 1 Yield Strips as Harvested") +
+  ylim(80, 240)
 ```
 
-```{r,EastQuarterHarvestPasses,eval=FALSE,echo=FALSE,fig.width=8,fig.height=3}
+```{r,EastQuarterHarvestPasses,fig.cap="GAM smoothed harvest passes from example 1.",echo=FALSE,fig.width=8,fig.height=3}
 ggplot(Smoothed.dat, aes(Easting,Yield)) + 
 geom_point(aes(colour = Product),size=.2) + 
 scale_colour_manual(values=cbPalette[pair.colors]) + 
-labs(colour = "Variety", x="Easting", y="Yield", title = "East Quarter, Smoothed Strips") +
-  ylim(100, 240)
+labs(colour = "Variety", x="Easting", y="Yield", title = "Example 1 Smoothed Harvest Passes") +
+  ylim(80, 240)
 ```
 
-```{r,EastQuarterAnalyzedPasses,eval=FALSE,echo=FALSE,fig.width=8,fig.height=3}
+```{r,EastQuarterAnalyzedPasses,fig.cap="Smoothed harvest passes pooled by experimental srips for Example 1",echo=FALSE,fig.width=8,fig.height=3}
 ggplot(Aggregated.dat, aes(Easting,Yield)) + 
 geom_point(aes(colour = Product),size=.2) + 
 scale_colour_manual(values=cbPalette[pair.colors]) + 
-labs(colour = "Variety", x="Easting", y="Yield", title = "East Quarter, Pooled Strips") +
-  ylim(100, 240)
-```
-
-
-```{r,echo=FALSE}
-TTests <- data.frame(
-  Easting = smooth.basis
-)
-for(i in 1:length(smooth.basis)) {
-  l <- smooth.basis[i]
-  obs <- Aggregated.dat[Aggregated.dat$Easting==l,]
-  product.means <- tapply(obs$Yield,list(obs$Product),mean,na.rm=TRUE)
-  product.sd <- tapply(obs$Yield,list(obs$Product),sd,na.rm=TRUE)
-  TTests$Delta[i] <- product.means[1]-product.means[2]
-  TTests$SD[i] <- sqrt(sum(product.sd^2)/2)
-}
-TTests$t <- TTests$Delta/(sqrt((2*TTests$SD^2)/6))
-TTests$P <- 2*(1-pt(TTests$t,10))
-```
-
-
-```{r,echo=FALSE,fig.width=8,fig.height=6}
-CombinedT <- data.frame(
-  Easting=rep(TTests$Easting,4),
-  Measure = c(rep('Treatment Differences',length(TTests$Delta)),
-              rep('Standard Deviation',length(TTests$SD)),
-              rep('t Ratio',length(TTests$t)),
-              rep('Probability>t',length(TTests$P))),
-  Value = c(TTests$Delta,TTests$SD,TTests$t,TTests$P),
-  Signficant = rep(TTests$P<0.05,4)
-)
-CombinedT$Measure <- factor(CombinedT$Measure,levels=c('Treatment Differences','Standard Deviation','t Ratio','Probability>t'))
-ggplot(CombinedT, aes(Easting,Value)) + 
-geom_point(aes(color=Signficant)) + #cbPalette[1]) + 
-scale_colour_manual(values=cbPalette) +
-labs(x="Easting", title = "Functional Statistics") + facet_wrap(~ Measure,nrow = 4,scales="free_y")
-```
-
-
-
-```{r,eval=FALSE}
-EastQuarter.gam <- gam(Yield ~ Product + s(Easting),data=EastQuarter.dat)
+labs(colour = "Variety", x="Easting", y="Yield", title = "Example 1 Pooled Strips") +
+  ylim(80, 240)
 ```
 
 
 ## Example 2
 
 ```{r,echo=FALSE}
-treated.2019.dat <- read.csv(file='../ManagementZoneML/data/B 2019 Soybeans Treated.csv')
+treated.2019.dat <- read.csv(file='../ManagementZoneML/data/B 2019 Soybean Treated.csv')
 left = 1000
 treated.2019.dat <- treated.2019.dat[treated.2019.dat$Longitude >left,]
+#the original data was anonymized to the southwest corner of 'Home'. After trimming the odd oblong shape, we standardize back to zero
+treated.2019.dat$Longitude <- treated.2019.dat$Longitude - min(treated.2019.dat$Longitude)
+treated.2019.dat$Latitude <- treated.2019.dat$Latitude - min(treated.2019.dat$Latitude)
+#remove outliers
+treated.2019.dat <- treated.2019.dat[treated.2019.dat$Yield<80,]
+treated.2019.dat <- treated.2019.dat[treated.2019.dat$Yield>0,]
 ```
 
 
@@ -388,7 +449,7 @@ scale_colour_gradient2(low=vermillion, mid=yellow, high=blue, midpoint = 0.5) +
 labs(colour = "Relative Rank", x="Easting", y="Northing", title = "Strip Trial")
 ```
 
-```{r,echo=FALSE,fig.width=10,fig.height=6}
+```{r, Example2SprayYieldMaps, echo=FALSE,fig.cap="Spray and harvest maps for Example 2", fig.width=10,fig.height=6}
 treated.2019.dat$SprayedRank <- rank(treated.2019.dat$Sprayed)
 treated.2019.dat$SprayedRank <- treated.2019.dat$SprayedRank/max(treated.2019.dat$SprayedRank)
 
@@ -419,11 +480,12 @@ treated.2019.dat$Northing <- treated.2019.dat$Latitude
 treated.2019.dat$Easting <- treated.2019.dat$Longitude
 ```
 
-```{r,FungicideActualYield,echo=FALSE,fig.width=8,fig.height=3}
+```{r,FungicideActualYield,fig.cap="Yield monitor harvest data from Example 2",echo=FALSE,fig.width=8,fig.height=3}
 ggplot(treated.2019.dat, aes(Northing,Yield)) + 
-geom_point(aes(colour = Sprayed),size=.2) + 
+#geom_point(aes(colour = Sprayed),size=.2) + 
+geom_line(aes(colour = Sprayed),linewidth=.2) + 
 scale_colour_manual(values=cbPalette[pair.colors]) + 
-labs(colour = "Sprayed", x="Northing", y="Yield", title = "Fungicide Trial, as Harvested") + ylim(0,60)
+labs(colour = "Sprayed", x="Northing", y="Yield", title = "Fungicide Trial, as Harvested") #+ ylim(0,60)
 ```
 
 ```{r, echo=FALSE}
@@ -444,6 +506,7 @@ for(strip in strips) {
   MaxN <- 2*(ceiling(MaxN/2))
   smooth2.basis <- seq(MinN,MaxN,by=2)
   current.gam <- gam(Yield ~ s(Northing),data=current.strip)
+  #current.gam <- gam(Yield ~ s(Northing,bs="ad"),data=current.strip)
   current.smoothed <- predict(current.gam, data.frame(Northing = smooth2.basis))
   L <- length(current.smoothed)
   Yield2 <- c(Yield2,current.smoothed)
@@ -454,8 +517,6 @@ for(strip in strips) {
   Treated2 <- c(Treated2,rep(current.strip$Sprayed[1],L))
   Northing2 <- c(Northing2,smooth2.basis)
 }
-
-
 Smoothed2.dat <- data.frame(
   Yield = Yield2,
   Easting = Easting2,
@@ -467,24 +528,87 @@ Smoothed2.dat <- data.frame(
 )
 ```
 
-```{r,AndersonsHarvestStrips,echo=FALSE,fig.width=8,fig.height=3}
+```{r,AndersonsHarvestStrips,fig.cap="Smoothed harvest strips for Example 2", echo=FALSE,fig.width=8,fig.height=3}
 ggplot(Smoothed2.dat, aes(Northing,Yield)) + 
 geom_point(aes(colour = Treated),size=.2) +
 scale_colour_manual(values=cbPalette[pair.colors]) + 
-labs(colour = "Sprayed", x="Northing", y="Yield", title = "Fungicide Trial, Smoothed Strips")
+labs(colour = "Sprayed", x="Northing", y="Yield", title = "Fungicide Trial, Smoothed Harvest Passes")
 ```
 
-```{r}
+```{r,echo=FALSE}
 Aggregated2.dat <- aggregate(Yield ~ Northing + Pass, FUN=mean, data=Smoothed2.dat)
 Aggregated2.dat$Treated <- Aggregated2.dat$Pass %in% c(2,4,6,8)
 ```
 
-```{r,FungicideAnalyzedPasses,echo=FALSE,fig.width=8,fig.height=3}
+```{r,FungicideAnalyzedPasses,fig.cap="Smoothed harvest strips pooled by experimental unit for Example 2",echo=FALSE,fig.width=8,fig.height=3}
 ggplot(Aggregated2.dat, aes(Northing,Yield)) + 
 geom_point(aes(colour = Treated),size=.2) + 
 scale_colour_manual(values=cbPalette[pair.colors]) + 
-labs(colour = "Variety", x="Northing", y="Yield", title = "Fungicide, Pooled Strips")
+labs(colour = "Variety", x="Northing", y="Yield", title = "Fungicide, Smoothed and Averaged Strips")
 ```
+
+
+# Results
+
+## Example 1
+
+```{r,UnivariateStripYields, fig.cap="Average yields of of pairs of harvested strips from Example 1", echo=FALSE,fig.width=8,fig.height=3}
+ggplot(means.dat, aes(x=Northing, y=Yield, color=Product,fill=Product)) +
+  geom_bar(stat="identity") + scale_colour_manual(values=cbPalette[pair.colors]) + scale_fill_manual(values=cbPalette[pair.colors])
+```
+
+Average strip values of plots in Figure \@ref(fig:UnivariateStripYields). These values were used to test for differences between varieties using a paired $t$-test. The difference between the two varieties was estimated to be 15.48 bu/acre, with an associated $t$ = 7.41 and $p(>t)$ = 0.00071.
+
+```{r,echo=FALSE}
+TTests <- data.frame(
+  Easting = smooth.basis
+)
+n <- 6
+for(i in 1:length(smooth.basis)) {
+  l <- smooth.basis[i]
+  obs <- Aggregated.dat[Aggregated.dat$Easting==l,]
+  
+  MeansB <- obs[obs$Product=="B",]
+  MeansE <- obs[obs$Product=="E",]
+  Differences <- MeansB$Yield - MeansE$Yield
+  TTests$Delta[i] <- mean(Differences)
+  TTests$SD[i] <- sd(Differences)
+  #product.means <- tapply(obs$Yield,list(obs$Product),mean,na.rm=TRUE)
+  #product.sd <- tapply(obs$Yield,list(obs$Product),sd,na.rm=TRUE)
+  #Delta <- product.means[1]-product.means[2]
+  #TTests$Delta[i] <- Delta
+  #PooledVar <- ((n-1)*product.sd[1]^2 + (n-1)*product.sd[2]^2)/(n+n-2)
+  #TTests$SD[i] <- sqrt(PooledVar)
+}
+TTests$t <- TTests$Delta/(TTests$SD*sqrt(1/n))
+TTests$P <- 2*(1-pt(TTests$t,n-1))
+```
+
+```{r,ResultsExample1, fig.cap = "Pointwise paired t-tests of variety strips from Example 1", echo=FALSE,fig.width=8,fig.height=6}
+CombinedT <- data.frame(
+  Easting=rep(TTests$Easting,4),
+  Measure = c(rep('Treatment Differences',length(TTests$Delta)),
+              rep('Standard Deviation',length(TTests$SD)),
+              rep('t Ratio',length(TTests$t)),
+              rep('Probability>t',length(TTests$P))),
+  Value = c(TTests$Delta,TTests$SD,TTests$t,TTests$P),
+  Signficant = rep(TTests$P<0.05,4)
+)
+CombinedT$Measure <- factor(CombinedT$Measure,levels=c('Treatment Differences','Standard Deviation','t Ratio','Probability>t'))
+ggplot(CombinedT, aes(Easting,Value)) + 
+geom_point(aes(color=Signficant)) + #cbPalette[1]) + 
+scale_colour_manual(values=cbPalette) +
+labs(x="Easting", title = "Functional Statistics") + facet_wrap(~ Measure,nrow = 4,scales="free_y")
+```
+
+Figure \@ref(fig:ResultsExample1), shows the results of pointwise paired $t$-test based on the smoothed value of harvested strips, over the interval [2,398] meters. The mean difference between variety yields is presented a continuous function of distance $x$ from the western edge of the field. In this example the difference is greatest in the eastern half of the field, but is consistently greater than 12 bu/acre. There are four regions where the $t$-test of mean differences is statistically significant, these correspond to regions where the standard deviation of variety differences is lower; that is, where yield is more consistent in strips from south to north.
+
+
+<!--Standard deviation also varies with position, reflecting the lowering yield patches at approximately 100m and 200m in the lower (southern) portion of the field. Since $t$ is a function of both difference and standard deviation (in this example, replicates are constant across the field) the test of significance also varies with position and the p-value associated with this test is more often significant in the western part of the field.-->
+
+<!--We should note that the largest region of significant differences between varieties occurs in a higher yield part of the field; the differences in low fertility zones are smaller and not statistically significant. This provides information about the physical cause of varietal differences. We might infer from this that variety # is a superior performer in high-yield zones, but still performs well in low-yield zones.-->
+
+## Example 2
 
 ```{r,echo=FALSE}
 MinN <- min(Aggregated2.dat$Northing)
@@ -493,24 +617,50 @@ t.basis <- seq(MinN,MaxN,by=2)
 TTests2 <- data.frame(
   Northing = t.basis
 )
+TTests2$SD <- NA
+TTests2$Delta <- NA
+TTests2$t <- NA
+TTests2$P <- NA
+
 for(i in 1:length(t.basis)) {
   l <- t.basis[i]
   obs <- Aggregated2.dat[Aggregated2.dat$Northing==l,]
-  product.means <- tapply(obs$Yield,list(obs$Treated),mean,na.rm=TRUE)
-  product.sd <- tapply(obs$Yield,list(obs$Treated),sd,na.rm=TRUE)
-  TTests2$Delta[i] <- product.means[2]-product.means[1] #since FALSE is ordered first
-  TTests2$SD[i] <- sqrt(sum(product.sd^2)/2)
-  TTests2$n[i] <- length(obs)/2
+  MeansSprayed <- obs[obs$Treated,]
+  MeansUnsprayed <- obs[!obs$Treated,]
+  if(length(MeansSprayed$Yield) == length(MeansUnsprayed$Yield)) {
+    n <- length(MeansSprayed)
+    if(n>1) {
+      Differences <- MeansSprayed$Yield - MeansUnsprayed$Yield
+      TTests2$Delta[i] <- mean(Differences)
+      TTests2$SD[i] <- sd(Differences)
+      TTests2$t[i] <- TTests2$Delta[i]/(TTests2$SD[i]*sqrt(1/n))
+      TTests2$P[i] <- 2*(1-pt(abs(TTests2$t[i]),n-1))
+    } else {
+      TTests2$Delta[i] <- NA
+    } 
+  } else {
+    TTests2$Delta[i] <- NA
+  }
+
+
+  #product.means <- tapply(obs$Yield,list(obs$Treated),mean,na.rm=TRUE)
+  #product.sd <- tapply(obs$Yield,list(obs$Treated),sd,na.rm=TRUE)
+  #Delta <- product.means[2]-product.means[1]
+  #TTests2$Delta[i] <- Delta
+  #PooledSD <- ((n-1)*product.sd[1]^2 + (n-1)*product.sd[2]^2)/(n+n-2)
+  #TTests2$SD[i] <- sqrt(PooledSD)
 }
-TTests2$t <- abs(TTests2$Delta/(sqrt((2*TTests2$SD^2)/TTests2$n)))
-TTests2$P <- 2*(1-pt(TTests2$t,2*(TTests2$n-1)))
+#TTests2$t <- TTests2$Delta/(TTests2$SD*sqrt((1/n + 1/n)))
+#TTests2$P <- 2*(1-pt(abs(TTests2$t),n+n-2))
+
+
 ```
 
 
-```{r,echo=FALSE,fig.width=8,fig.height=6}
+```{r,ResultsExample2,echo=FALSE,fig.width=8,fig.height=6}
 CombinedT2 <- data.frame(
   Northing=rep(TTests2$Northing,4),
-  Measure = c(rep('Treatment Differences',length(TTests2$Delta)),
+  Measure = c(rep('Difference (Sprayed-Unsprayed)',length(TTests2$Delta)),
               rep('Standard Deviation',length(TTests2$SD)),
               rep('t Ratio',length(TTests2$t)),
               rep('Probability>t',length(TTests2$P))),
@@ -520,14 +670,21 @@ CombinedT2 <- data.frame(
 
 CombinedT2 <- CombinedT2[!is.na(CombinedT2$Signficant),]
 
-CombinedT2$Measure <- factor(CombinedT2$Measure,levels=c('Treatment Differences','Standard Deviation','t Ratio','Probability>t'))
+#CombinedT2$Measure <- factor(CombinedT2$Measure,levels=c('Treatment Difference (Sprayed-Unsprayed)','Standard Deviation','t Ratio','Probability>t'))
 ggplot(CombinedT2, aes(Northing,Value)) + 
 geom_point(aes(color=Signficant)) + #cbPalette[1]) + 
 scale_colour_manual(values=cbPalette) +
-labs(x="Northing", title = "Functional Statistics") + facet_wrap(~ Measure,nrow = 4,scales="free_y") + xlim(650,1400)
+labs(x="Northing", title = "Functional Statistics") + facet_wrap(~ Measure,nrow = 4,scales="free_y") #+ xlim(650,1400)
 ```
+Because the experimental strips were not of the same length, a univariate paired $t$-test was not performed. Instead, pointwise paired $t$ tests were conducted as in Example 1. 
+
+In Figure \ref{fig:ResultsExample2}, that the average difference between fungicide-treated strips and the adjacent untreated strips regions varied considerably; from -10 to 10 bushels per acre. The curves for means and test statistics are discontinuous, reflecting the uneven nature of the treated strips. We find a single region of about four meters where we find statistically significant differences between the treated and untreated strips. The treated strips yielded roughly 5-10 bushels/acre less than untreated strips in this region. This difference occurred in a region of the field where there where only two treated strips that overlapped with unplantable regions of the field. 
+
+In general, the fungicide trial as executed is not suitable for functional data analysis, due to the discontinuous nature of the strips and the naturally occurring unplantable spots in the field. However, these data may be amenable to spatial analysis using generalized linear models and the ability of the default smoothing function `s` from the library `mgcv` `gam` function to fit functions in two dimensions. We explore this in a later section.
+
 
 # Discussion
+
 ## Summarizing Results
 Presentation of experimental results in functional form as an appeal. Consider how a farmer might experience crop yields - in a harvester, moving through time and space. Yield changes may be detectable by changes in engine speed or output; a farmer may remember patches of different soil types experienced during planting. 
 
@@ -535,43 +692,119 @@ This method is not suitable for all executions of on-farm strip trials. In this 
 
 This method may also be problematic when the strips are not all of the same length or there are gaps in the strips, as shown in Example 2. The number of replicates is not a constant function of distance, so there will be jumps in the functional form of the $t$-test; this is a less visually appealing presentation and may make interpretation difficult.
 
-Finally, the examples presented here were not truly randomized within blocks; each pair of strips has the same treatment structure. It would be desirable to assign treatments at random among pairs of strips, but that presents extra effort in the execution of the strip trial, and may be impossible as in the case of a split-planter trial. The lack of randomization among units may introduce a bias in the analysis. Indeed, in the first example there is a definite yield trend from north to south that may have resulted in larger than expected yield differences among the two varieties. Spatial methods can be used to model variation in two dimensions and can provide a more accurate assessment 
+We've made a deliberate choice to use the default smoothing algorithm chosen by the software package `mgcv`. If our interest where only the analysis of a single strip trial, we might identify optimal smoothing parameters for each harvest strip by systematically varying the number of knots per strip (`k` as a argument to `s`, in `gam` syntax). However, for this method to be broadly useful, it would be a applied to a large number of strip trials, and fitting harvest strips individually may be prohibitive. In this case, we accept the default smoothing interpolating of `mgcv` `gam` function as good enough for general use.
 
-# Interpretation of p-values
+It might be possible to code a single model that fits all harvest passes simultaneously, using a single smoothing parameter for each harvest pass. However, variability for these data is patchy in 2 dimensions. Consider, for example, the low yielding zone at the southern most portion of the field at about 100m easting. The optimal smoothing parameter for harvest passes passing through this region is likely to be different than harvest passes in the northern portion of the field, where yield across the field is higher yielding. 
 
+Frequently, fields are partitioned into management zones[@clay.7-02-2018]. If the strips are oriented such that harvest passes cover different management zones, and management zone have be previously defined, this method of presenting analysis can include management zones in the model as a covariate, or visual inspection of the pointwise statistical analysis can give insight into the behavior of the treatments in different management zones.
+
+Finally, the examples presented here were not truly randomized within blocks; each pair of strips has the same treatment order. It would be desirable to assign treatments at random among pairs of strips, but that presents extra effort in the execution of the strip trial, and may be impossible as in the case of a split-planter trial. The lack of randomization among units may introduce a bias in the analysis. Indeed, in the first example there is a definite yield trend from north to south that may have resulted in larger than expected yield differences among the two varieties. Spatial methods can be used to model variation in two dimensions and can provide a more accurate assessment 
+
+## Comparison with other methods.
+
+[@piepho-11-2011] proposes a method of analysis of strip trials, according to the following algorithm:
+
+1. overall assessment of the treatments based on plot-averages
+2. overall assessment of the treatments based on subsamples without taking geo-referencing into account
+3. inspection of residuals from step (2) for associations with covariates
+4. overall assessment of the treatments based on spatial modelling of geo-reference subsamples with and without taking covariates into account
+5. spatial analysis of all geo-referenced subsamples based on categorised deflect angles with and without taking covariates into account.
+
+This method involved dividing the field into 30m grid, with each grid designated as a plot This method does not consider strips as experimental entities, instead the data were averaged and centered on the midpoint each grid, then geospatial methods were applied. This method does have the advantage of incorporation of geospatial information such as EC.
+
+[@lawes.r-03-2012] produces graphic displays similar to those presented here. However, instead of finding functional forms for the data, the data were divided into a are regular 5 m grid or $n$ rows by $m$ columns, and pairwise $t$ tests was performed between two rows by subsetting the original $n \times m$ array into groups of 5 consecutive columns and two rows. The process was repeated by moving the position where the five columns were selected, for a total of $m-5$ total $t$-tests. This method was considered analogous to a moving window regression, with the exception that the windows were used for $t$-tests. This method seems fundamentally flawed when we consider the five columns used a replicates are not independent experimental units; as described, the analysis method used only two rows.
+
+[@evans-11-2020] used geographically weighted regression for the analysis of strip trials. This method has the advantage of partitioning variance in strip trials into spatial variability and treatment components.
+
+[@stefanova-04-2023] used a clustering method to delineate strips into comparable pseudo-environments, then analyzed the resulting clusters as multienvironment trials using linear mixed models.
+
+On-farm participatory trials are not limited to strip trials. The Data‐Intensive Farm Management Project (DIFM) [@bullock-11-2019] combines randomized blocks of systematically randomized variable rates of inputs in grids. 
+
+Spatial analysis of strip-plot and split-field trials has also been used with some success [@griffin-08-2008]. 
+
+The Iowa Soybean Association On-Farm Research Network provides simple $t$-test based analysis, but also provides a online, interactive tool (ISOFAST)[@laurent-11-2019] for summarizing results of multiple on-farm trials.
+
+
+# Further Work
+
+The example used to present a method of functional analysis are better understood as systematic strip arrangements, as opposed to more traditionally randomized trials. Randomization is key if causal effects are to be investigated, but randomization may not always be practical, so in many cases farmers are recommended to use systematic strips. However, if trends are accounted for, systematic trials can be effective [@alesso-11-2019, @cao-06-2022]. In the following section, we consider trend analysis incorporated into functional data analysis.
 
 
 # Tables
 
-Strip | Variety | Yield Data Points | Yield Average | Sample SD | Sample SE | Northing
-------|---------|-------------------|---------------|-----------|-----------|----------
-1     |       E | 518 | 162.8279 | 29.83083 | 0.2399760 | 3.787845
-2     |       B | 527 | 175.5724 | 39.67935 | 0.2743955 | 16.082465
-3     |       E | 519 | 163.8603 | 32.22227 | 0.2491692 | 28.274649
-4     |       B | 526 | 188.5818 | 30.38731 | 0.2403551 | 40.354902
-5     |       E | 530 | 175.2685 | 27.12060 | 0.2262099 | 52.571117
-6     |       B | 528 | 192.4624 | 24.31691 | 0.2146037 | 64.626749
-7     |       E | 535 | 185.2256 | 23.45168 | 0.2093679 | 76.832520
-8     |       B | 530 | 197.2943 | 23.57872 | 0.2109221 | 89.062328
-9     |       E | 529 | 181.0466 | 26.00689 | 0.2217259 | 101.170738
-10    |       B | 542 | 191.6723 | 24.83957 | 0.2140782 | 113.383573
-11    |       E | 551 | 193.0240 | 25.16112 | 0.2136924 | 125.521797
-12    |       B | 534 | 208.5366 | 20.67455 | 0.1967648 | 137.705798
-      |  |  | Treatment Mean | SD |  | 
-      | E |  | 192.3533 | 11.97669 |  | 
-      | B |  | 176.8755 | 10.79454 |  | 
-      | Difference |  |  | 11.38561 |  | 
+
+Strip |    Variety | Yield Data Points |  Yield Average |  Mean Northing | Minimum Northing | Maximum Northing | Strip Length
+------|------------|-------------------|----------------|----------------|------------------|-----------------|-------------
+1     |          E |               518 |       162.8279 |       3.787845 |          0.00000 |        7.632746 | 397.9177
+2     |          B |               527 |       175.5724 |      16.082465 |         12.21129 |       19.866204 | 397.7855
+3     |          E |               519 |       163.8603 |      28.274649 |         24.30062 |       31.996561 | 399.4099
+4     |          B |               526 |       188.5818 |      40.354902 |         36.51413 |       44.140222 | 398.3487
+5     |          E |               530 |       175.2685 |      52.571117 |         48.68439 |       56.358159 | 398.1456
+6     |          B |               528 |       192.4624 |      64.626749 |         60.91453 |       68.497385 | 398.6063
+7     |          E |               535 |       185.2256 |      76.832520 |         73.02715 |       80.657674 | 398.7921
+8     |          B |               530 |       197.2943 |      89.062328 |         85.30384 |       92.888915 | 399.1178
+9     |          E |               529 |       181.0466 |     101.170738 |         97.37433 |      105.116829 | 398.6082
+10    |          B |               542 |       191.6723 |     113.383573 |        109.45813 |      117.226123 | 399.5909
+11    |          E |               551 |       193.0240 |     125.521797 |        121.63394 |      129.328765 | 399.3563
+12    |          B |               534 |       208.5366 |     137.705798 |        133.70443 |      141.475751 | 398.3669 
+<!--      |            |                   | Treatment Mean | SD             |                  |                 |
+      |          E |                   | 192.3533       | 11.97669       |                  |                 |
+      |          B |                   | 176.8755       | 10.79454       |                  |                 |
+      | Difference |                   |       11.38561 |                |                  |                 |
+      |      $S_p$ |                   |       11.40095 |                |                  |                 |
+      | $t$ ratio  |                   |       2.351418 |                |                  |                 |
+      | p(>$t$)    |                   |     0.04054249 |                |                  |                 | -->
+Table: Summmary of strips from Example 1  
       
-      
-Formula      | Univariate | Functional 
+Formula      | Univariate                | Functional 
 -------------|---------------------------|--------------
-Means model  |  $y_{ij} = \mu_i + e_{ij}$ | $y_{ij}(d) = \mu_i(d) + e_{ij}(d)$       	
-Mean estimate	|  $\widehat{\mu}_i = \frac{\sum_{j=1}^{N_i} y_{ij}}{N_i}$ |$\widehat{\mu}_i(d) = \frac{\sum_{j=1}^{N_i} y_{ij}(d)}{N_i}$
-Variance estimate	|  $\widehat{\sigma}^2 = \frac{\sum_{j=1}^{N} (y_{ij}-\widehat{\mu}_i)^2}{N - k}$ | $\widehat{\sigma}^2(d) = \frac{\sum_{j=1}^{N(d)} (y_{ij}(d)-\widehat{\mu}_i(d))^2}{N(d) - k(d)}$
-Difference between means		|  $\widehat{\delta} = \widehat{\mu}_i-\widehat{\mu}_j$ | $\widehat{\delta}(d) = \widehat{\mu}_i(d)-\widehat{\mu}_j(d)$
-Test statistic 	|  $t = \frac{\widehat{\delta}}{\sqrt{2 \widehat{\sigma}^2 / n}}$ | $t = \frac{\widehat{\delta(d)}}{\sqrt{2 \widehat{\sigma}^2(d) / n(d)}}$
-		
+Means model  |  $y_{ij} = \mu_i + e_{ij}$ | $y_{ij}(x) = \mu_i(x) + e_{ij}(x)$
+Paired Difference | $d_j = y_{1j} - y_{2j}$ | $d_j(x) = y_{1j}(x) - y_{2j}(x)$
+Mean Difference |$\bar{d} = \frac{1}{n} \sum_{j=1}^n d_j$| $\bar{d}(x) = \frac{1}{n(x)} \sum_{j=1}^n(x) d_j(x)$|
+Number of Pairs | $n$ | $n(x)$
+$t$ statistic 	| $t_0 = \frac{\bar{d}}{S_d/\sqrt{n}}$ | $t_0(x) = \frac{\bar{d}(x)}{S_d(x)/\sqrt{n(x)}}$ 
+Standard deviation of paired differences | $S_d = \sqrt{\frac{\sum_{j=1}^n (d_j - \bar{d})^2}{n-1}}$ | $S_d(x) = \sqrt{\frac{\sum_{j=1}^n(x) (d_j(x) - \bar{d(x)})^2}{n(x)-1}}$ 
+<!--
+Sample Mean	|  $\bar{y}_i = \frac{\sum_{j=1}^{N_i} y_{ij}}{N_i}$ | $\bar{y}_i(d) = \frac{\sum_{j=1}^{N_i(d)} y_{ij}(d)}{N_i(d)}$
+Sample Variance	|  $S_i^2 = \frac{\sum_{j=1}^{N_i} (y_{ij}-\bar{y}_i)^2}{N_1 - 1}$ | $S_i^2(d) = \frac{\sum_{j=1}^{N_i(d)} (y_{ij}(d)-\bar{y}_i(d))^2}{N_1(d) - 1}$
+Pooled Standard Deviations | $S_p = \sqrt{\frac{(N_1 -1) S_1^2 + (N_2-1)S_2^2}{N_1+N_2-2}$ | $S_p^2(d) = \frac{(N_1(d) -1) S_1^2(d) + (N_2(d)-1)S_2^2(d)}{N_1(d)+N_2(d)-2}}$          
+$t$ statistic 	|  $t_0=\frac{\bar{y}_1-\bar{y}_2}{S_p \sqrt{\frac{1}{N_1} + \frac{1}{N_2}}}$ | $t_0(d)=\frac{\bar{y}_1(d)-\bar{y}_2}{S_p(d) \sqrt{\frac{1}{N_1(d)} + \frac{1}{N_2(d)}}}$
+-->
+
+Table: Univariate and Functional forms of statistics used to compare strips. $i = 1, 2$ is the number of treatments, $j = 1, \cdots, J$ are the number of strips per treatment and $x$ is the distance from one side of the field (`Northing` or `Easting`, depending on the field.)
+
 <!-- Required replicates	 -->
 <!-- Detectable differences	 -->
-      
+
+From [@wood-2017], p 396
+
+```{r}
+b <- gam(Yield ~ Product + s(Easting,by=Pass), data=EastQuarter.dat)
+summary(b)
+par(mfrow=c(2,2))
+plot(b)
+```
+
+```{r}
+b <- gam(Yield ~ Product + s(Easting,by=Pass,bs='bs'), data=EastQuarter.dat)
+summary(b)
+par(mfrow=c(2,2))
+plot(b)
+```
+
+```{r}
+b <- gam(Yield ~ Product + s(Easting,by=Pass,bs='ps'), data=EastQuarter.dat)
+summary(b)
+par(mfrow=c(2,2))
+plot(b)
+```
+
+```{r}
+b <- gam(Yield ~ Product + s(Easting,by=Pass,bs='ad'), data=EastQuarter.dat)
+summary(b)
+par(mfrow=c(2,2))
+plot(b)
+```
+
+
 # References

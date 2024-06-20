@@ -6,6 +6,9 @@ output:
   html_document: default
   pdf_document: default
 bibliography: biblio.bib
+editor_options: 
+  markdown: 
+    wrap: 72
 ---
 
 ```{r setup, include=FALSE}
@@ -23,110 +26,56 @@ reddishpurple <- "#CC79A7"
 
 Random Fields
 
+Abstract
 
-Abstract 
+# Introduction 
 
-1 Introduction 
 Suppose we have a uniformity trial, or a single season harvest. We write a model
 
 $$
 Y(\mathbf{s})=\mu(\mathbf{s})+Z(\mathbf{s})+e(\mathbf{s}) 
 $$
 
+where all variables are indexed by point
+$\mathbf{s}=\left\{s_1,\dots ,s_n\right\} \in \mathbb{R}^n$ (typically,
+$\mathbf{s}$ will be in $\mathbb{R}^2$ ). $Y$ is the measured yield,
+usually in units such as bushels per acre. We take Î¼ to be the expected
+yield and may be estimated by an average yield over multiple growing
+seasons, although for some fields we may have only the single season
+data. Both $Z$ and $e$ are random variables. $Z$ is the deviation for a single
+growing season from the expected yield. $e$ is a white-noise process
+associated with measurement error for a sample taken at point
+$\mathbf{s}$. When we have single season data we will not be able to
+decompose Î¼ and $Z$; so we may assume Î¼ is constant 1. Or we can drop it
+from the model and include it in the distribution of $Z$  and write
+$Y(\mathbf{s})=\mu+Z(\mathbf{s})+e(\mathbf{s})$ We will also require
+that $Z$ be continuous, while $e$ is not required to be continuous. That is,
+$Z$ is a single realizaton of a random variable in $\mathbb{R}^2$, while $e$
+is an arbitrary (finite) set in $\mathbb{R}$.
 
-where all variables are indexed by point $\mathbf{s}=\left\{s_1,\dots ,s_n\right\} \in \mathbb{R}^n$ (typically, $\mathbf{s}$ will be in $\mathbb{R}^2$ ). Y is the measured yield, usually in units such as bushels per acre. We take Î¼ to be the expected yield and may be estimated by an average yield over multiple growing seasons, although for some fields we may have only the single season data. 
-Both Z and e are random variables. Z is the deviation for a single growing season from the expected yield. e is a white-noise process associated with measurement error for a sample taken at point $\mathbf{s}$.
-When we have single season data we will not be able to decompose Î¼ and Z; so we may assume Î¼ is constant
-1. Or we can drop it from the model and include it in the distribution of Z.  ^1 and write
-$Y(\mathbf{s})=\mu+Z(\mathbf{s})+e(\mathbf{s}) $
-We will also require that Z be continuous, while e is not required to be continuous. That is, Z is a single realizaton of a random variable in $\mathbb{R}^2$, while e is an arbitrary (finite) set in $\mathbb{R}$.
+## Characteristics of a Random Field 
+### Stationarity 
+Briefly, stationarity implies that the variance of the field Z is constant over
+space. When the field is non-stationary variance will be a function of
+\mathbf{s}. We might2. Might. In most cases, a field of this form is
+closed and bounded. Perhaps uniform vs absolute continuity state
+that when Z is stationary, then Z is uniformly continuous, while Z may
+be continuous, but not uniformly continuous, if non-stationary. 
 
-2 Characteristics of a Random Field 
-2.1 Stationarity 
-Briefly, stationarty implies that the variance of the field Z is constant over space. When the field is non-stationary variance will be a function of \mathbf{s}. We might2. Might. In most cases, a field of this form is closed and bounded. Perhaps uniform vs absolute continuity?  ^2 state that when Z is stationary, then Z is uniformly continuous, while Z may be continuous, but not uniformly continuous, if non-stationary.
-2.2 Isotropy 
-We write the relationship (covariance) between yeild measured at two points $\mathbf{s},\mathbf{s}'$ as
+### Isotropy 
+
+We write the relationship (covariance) between yield measured
+at two points $\mathbf{s},\mathbf{s}'$ as 
+
 $$
 Cov(\mathbf{s},\mathbf{s}')=E[Y(\mathbf{s})-Y(\mathbf{s}')]=Z(\mathbf{s})-Z(\mathbf{s}')+e(\mathbf{s})-e(\mathbf{s}')=Z(\mathbf{s}-\mathbf{s}')+e(\mathbf{s}-\mathbf{s}') 
 $$
 
-When $Cov(\mathbf{s},\mathbf{s}')$ depends only on the distance between points, $\mathbf{s}-\mathbf{s}'$ a field is said to be isotropic. If covariance depends in direction3. Maybe denoted by $|\mathbf{s}| |\mathbf{s}'|cos\theta$ the the field is said to be anisotropic.
-
-```{r}
-yield.z.fn <- function(values,rng=3) {
-  values <- values[!is.na(values)]
-  yield.mean <- mean(values)
-  yield.sd <- sd(values)
-  return((values-yield.mean)/yield.sd)
-}
-
-load(file='../ManagementZoneML/home.squares.Rda')
-
-home.2013.dat$Year <- 2013
-home.2015.dat$Year <- 2015
-home.2016.dat$Year <- 2016
-home.2017.dat$Year <- 2017
-home.2018.dat$Year <- 2018
-
-home.2013.dat$Rank <- rank(home.2013.dat$VRYIELDVOL)
-home.2015.dat$Rank <- rank(home.2015.dat$VRYIELDVOL)
-home.2016.dat$Rank <- rank(home.2016.dat$VRYIELDVOL)
-home.2017.dat$Rank <- rank(home.2017.dat$VRYIELDVOL)
-home.2018.dat$Rank <- rank(home.2018.dat$VRYIELDVOL)
-
-home.2013.dat$PercentRank <- 100*home.2013.dat$Rank/max(home.2013.dat$Rank)
-home.2015.dat$PercentRank <- 100*home.2015.dat$Rank/max(home.2015.dat$Rank)
-home.2016.dat$PercentRank <- 100*home.2016.dat$Rank/max(home.2016.dat$Rank)
-home.2017.dat$PercentRank <- 100*home.2017.dat$Rank/max(home.2017.dat$Rank)
-home.2018.dat$PercentRank <- 100*home.2018.dat$Rank/max(home.2018.dat$Rank)
-
-
-home.2013.dat$Z <- yield.z.fn(home.2013.dat$VRYIELDVOL)
-home.2015.dat$Z <- yield.z.fn(home.2015.dat$VRYIELDVOL)
-home.2016.dat$Z <- yield.z.fn(home.2016.dat$VRYIELDVOL)
-home.2017.dat$Z <- yield.z.fn(home.2017.dat$VRYIELDVOL)
-home.2018.dat$Z <- yield.z.fn(home.2018.dat$VRYIELDVOL)
-
-harvest.dat <- rbind(home.2013.dat,
-  home.2015.dat,
-  home.2016.dat,
-  home.2017.dat,
-  home.2018.dat)
-# The column names are taken from the raw data and are a bit obscure, give them more meaningful names.
-names(harvest.dat)[4] <- 'Yield'
-names(harvest.dat)[12] <- 'Longitude'
-names(harvest.dat)[13] <- 'Latitude'
-```
-
-```{r,fig.width=9,fig.height=5,echo=FALSE}
-ggplot(harvest.dat, aes(Longitude,Latitude)) + 
-geom_point(aes(colour = Yield),size=.5) + 
-scale_colour_gradient(low=yellow, high=bluishgreen) +
-labs(colour = "Yield", x="X (m)", y="Y (m)") + facet_wrap(~ Year)
-```
-
-```{r,fig.width=9,fig.height=5,echo=FALSE}
-ggplot(harvest.dat, aes(Longitude,Latitude)) + 
-geom_point(aes(colour = PercentRank),size=.5) + 
-scale_colour_gradient(low=grey, high=orange) +
-labs(colour = "Rank", x="X (m)", y="Y (m)") + facet_wrap(~ Year)
-```
-
-```{r,fig.width=9,fig.height=5,echo=FALSE}
-ggplot(harvest.dat, aes(Longitude,Latitude)) + 
-geom_point(aes(colour = PercentRank),size=.5) + 
-scale_colour_gradient2(low=vermillion, mid=yellow, high=blue,midpoint = 50) +
-labs(colour = "Rank", x="X (m)", y="Y (m)") + facet_wrap(~ Year)
-```
-
-
-```{r,fig.width=9,fig.height=5,echo=FALSE}
-ggplot(harvest.dat, aes(Longitude,Latitude)) + 
-geom_point(aes(colour = Z),size=.5) + 
-scale_colour_gradient2(low=vermillion, mid=yellow, high=blue) +
-labs(colour = "Z", x="X (m)", y="Y (m)") + facet_wrap(~ Year)
-```
+When $Cov(\mathbf{s},\mathbf{s}')$ depends only on the distance between
+points, $\mathbf{s}-\mathbf{s}'$ a field is said to be isotropic. If
+covariance depends in direction, denoted by
+$|\mathbf{s}| |\mathbf{s}'|cos\theta$, then the field is said to be
+anisotropic.
 
 
 # References
-

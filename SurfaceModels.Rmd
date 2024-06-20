@@ -1,0 +1,357 @@
+---
+title: "Surface Models"
+author: "Peter Claussen"
+date: "7/2/2020"
+output:
+  html_document: default
+  pdf_document: default
+bibliography: bibliography.bib
+---
+
+```{r setup, include=FALSE}
+library(gstat)
+library(ggplot2)
+grey <- "#999999"
+orange <- "#E69F00"
+skyblue <- "#56B4E9"
+bluishgreen <- "#009E73"
+yellow <- "#F0E442"
+blue <- "#0072B2"
+vermillion <- "#D55E00"
+reddishpurple <- "#CC79A7"
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7",
+                "#000000","#734f80", "#2b5a74", "#004f39", "#787221", "#003959", "#6aaf00", "#663cd3")
+```
+
+How do we fit a smoothing function to a two-dimensional random field, as realized by yield data in a cropland? 
+
+There are several methods available, all with hyperparameters that control the degree of smoothing. What is our best choice, in R, for identifying a two-dimensional functional form that represents the realized yield for a given year, and can we use the results of such fitting for functional data analysis?
+
+We start with the cropland labelled G. This is a fairly small but approximately rectangular cropland without gaps due to salt seeps or other problem areas. We have several years worth of data, and these can be loaded in programmatically with file names based on a simple pattern.
+
+## Load Data
+
+```{r,eval=TRUE,echo=FALSE}
+field = 'G'
+root = '../ManagementZoneML/data/'
+
+#2014 is incomplete data
+Years <- c(2013,2015,2016,2017,2018,2020,2021)
+Crops <- c('Corn','Corn','Soybeans','Corn','Soybeans','Corn','Soybeans')
+
+source('./R/read.yield.data.R')
+source('./R/remove.harvest.outliers.fn.R')
+harvests <-vector(mode='list',length=length(Years))
+for(i in 1:length(Years)) {
+  harvests[[i]] <- read.yield.data(root,field,Years[i],Crops[i],outlier=5)
+}
+```
+
+We use a function to combine the field maps and add a quantile field that let's us visualize yield by rank within each year. This limits the impact of outliers in our visualization. The data will have been screened for outliers while being read. We remove observations that are greater than 5 sd from the mean.
+
+```{r,fig.width=8,fig.height=4.5,echo=FALSE}
+source('./R/combined.map.R')
+Maps7 <- combined.map(harvests)
+ggplot(Maps7, aes(Easting,Northing)) + 
+geom_point(aes(colour = Quantile),size=.5) + 
+scale_colour_gradient2(low=vermillion, mid=yellow, high=blue, midpoint = 0.5) +
+labs(colour = "Relative Yield Rank", x="Easting", y="Northing", title = "Multiple Years") + facet_wrap(~ Map)
+```
+
+It appears that 2020 is good candidate for further exploration; it has reasonably uniform harvest pass distribution with mostly straight line passes.
+
+```{r}
+harvest.dat <- harvests[[6]]
+```
+
+
+```{r}
+library(ncf)
+Yield.lisa <- lisa(harvest.dat$Easting, harvest.dat$Northing, harvest.dat$Yield, 
+                       neigh=60, resamp=500, quiet=TRUE)
+```
+
+```{r}
+plot(Yield.lisa)
+```
+# Polynomial regression.
+
+We start with the simplest form of linear models for trend surfaces - simply polynomials. 
+
+```{r}
+source('./R/spatial.model.selection.R')
+LM <- spatial.model.selection(harvest.dat,
+                                           range=c(1,21),
+                                           method='lm',
+                                           models=8,
+                                           moments=FALSE)
+```
+
+```{r}
+source('./R/spatial.selection.plots.R')
+Plots <- spatial.selection.plots(LM)
+print(Plots)
+```
+
+```{r}
+par(mfrow=c(1,2))
+#lm12 <- lm(Yield ~ poly(Easting,12)*poly(Northing,12)),data=harvest.dat)
+
+plot <- harvest.dat[,c("Easting","Northing")]
+plot$Yield <- predict(LM$Models[[3]])
+plot$Yield <- plot$Yield/max(plot$Yield)
+plot$Source <- "Predicted"
+
+predict.lisa <- lisa(plot$Easting, plot$Northing, plot$Yield, 
+                       neigh=60, resamp=500, quiet=TRUE)
+plot(predict.lisa)
+
+tmp <- harvest.dat[,c("Easting","Northing")]
+tmp$Yield <- residuals(LM$Models[[3]])
+tmp$Yield <- tmp$Yield/max(tmp$Yield)
+tmp$Source <- "Residuals"
+
+residuals.lisa <- lisa(tmp$Easting, tmp$Northing, tmp$Yield, 
+                       neigh=60, resamp=500, quiet=TRUE)
+plot(residuals.lisa)
+
+plot <- rbind(plot,tmp)
+```
+
+
+```{r,fig.width=5,fig.height=4.5,echo=FALSE}
+ggplot(plot, aes(Easting,Northing)) + 
+geom_point(aes(colour = Yield),size=.5) + 
+scale_colour_gradient2(low=vermillion, mid=yellow, high=blue, midpoint = median(tmp$Yield)) +
+labs(colour = "Relative Yield Rank", x="Easting", y="Northing", title = "Yield estimates and residuals") + facet_wrap(~ Source)
+```
+
+```{r,eval=FALSE}
+for (i in 1:length(Models$Models)) {
+  plot <- harvest.dat[,c("Easting","Northing")]
+  plot$Yield <- predict(LM$Models[[i]])
+  plot$Yield <- plot$Yield/max(plot$Yield)
+  plot$Source <- "Predicted"
+
+  predict.lisa <- lisa(plot$Easting, plot$Northing, plot$Yield, 
+                       neigh=60, resamp=500, quiet=TRUE)
+  plot(predict.lisa)
+
+  tmp <- harvest.dat[,c("Easting","Northing")]
+  tmp$Yield <- residuals(LM$Models[[i]])
+  tmp$Yield <- tmp$Yield/max(tmp$Yield)
+  tmp$Source <- "Residuals"
+
+  residuals.lisa <- lisa(tmp$Easting, tmp$Northing, tmp$Yield, 
+                       neigh=60, resamp=500, quiet=TRUE)
+  plot(residuals.lisa)
+}
+```
+
+# GAM models
+
+```{r}
+GAM <- spatial.model.selection(harvest.dat,
+                                           range=c(4,300),
+                                           method='gam',
+                                           models=8,
+                                           moments=FALSE)
+```
+
+```{r}
+Plots <- spatial.selection.plots(GAM)
+print(Plots)
+```
+
+```{r}
+#lm12 <- lm(Yield ~ poly(Easting,12)*poly(Northing,12)),data=harvest.dat)
+par(mfrow=c(1,2))
+plot <- harvest.dat[,c("Easting","Northing")]
+plot$Yield <- predict(GAM$Models[[6]])
+plot$Yield <- plot$Yield/max(plot$Yield)
+plot$Source <- "Predicted"
+
+persp(plot$Easting, plot$Northing, plot$Yield)
+```
+
+```{r,eval=FALSE}
+predict.lisa <- lisa.nc(plot$Easting, plot$Northing, plot$Yield, 
+                       neigh=60, resamp=500, quiet=TRUE)
+plot(predict.lisa)
+```
+
+```{r}
+tmp <- harvest.dat[,c("Easting","Northing")]
+tmp$Yield <- residuals(GAM$Models[[6]])
+tmp$Yield <- tmp$Yield/max(tmp$Yield)
+tmp$Source <- "Residuals"
+persp(tmp$Easting, tmp$Northing, tmp$Yield)
+```
+
+```{r,eval=FALSE}
+residuals.lisa <- lisa(tmp$Easting, tmp$Northing, tmp$Yield, 
+                       neigh=60, resamp=500, quiet=TRUE)
+plot(residuals.lisa)
+```
+
+```{r}
+plot <- rbind(plot,tmp)
+```
+  
+
+
+
+
+## Functional models for Random Fields
+
+
+
+Borrowed from 7.grid_cells.Rmd (Workshop)
+
+```{r,eval=FALSE}
+grid.dists <- as.matrix(dist(cbind(harvest.dat$Easting,harvest.dat$Northing)))
+grid.dists <- 1/grid.dists
+diag(grid.dists) <- 0
+library(ape)
+
+Moran.tbl <- data.frame(Source=rep(0,7),
+                        Expected=rep(0,7),
+                        MoranI.Y=rep(NA,7),
+                        SD.Y=rep(NA,7),
+                        p.Y=rep(NA,7),
+                        MoranI.Res=rep(NA,7),
+                        SD.Res=rep(NA,7),
+                        p.Res=rep(NA,7))
+
+yield.I <- Moran.I(harvest.dat$Yield, grid.dists)
+Moran.tbl$Source[1] <- 0
+Moran.tbl$MoranI.Y[1] <- yield.I$observed
+Moran.tbl$Expected <- yield.I$expected
+Moran.tbl$SD.Y[1] <- yield.I$sd
+Moran.tbl$p.Y[1] <- yield.I$p.value
+Moran.tbl$MoranI.Res[1] <- 0
+Moran.tbl$p.Res[1] <- 1
+for(i in 1:6) {
+  yield.I <-Moran.I(Estimates[[i]]$Yield, grid.dists)
+  res.I <-Moran.I(Estimates[[i]]$residuals, grid.dists)
+  Moran.tbl$Source[i+1] <- spans[i]
+  Moran.tbl$MoranI.Y[i+1] <- yield.I$observed
+  Moran.tbl$SD.Y[i+1] <- yield.I$sd
+  Moran.tbl$p.Y[i+1] <- yield.I$p.value
+  Moran.tbl$MoranI.Res[i+1] <- res.I$observed
+  Moran.tbl$SD.Res[i+1] <- res.I$sd
+  Moran.tbl$p.Res[i+1] <- res.I$p.value
+}
+Moran.tbl
+```
+
+```{r,eval=FALSE}
+par(mfrow=c(1,3))
+plot(MoranI.Y ~ Source,data=Moran.tbl)
+plot(MoranI.Res ~ Source,data=Moran.tbl)
+plot(MoranI.Res ~ MoranI.Y,data=Moran.tbl)
+```
+
+```{r}
+#fit<-lm(Yield ~ bs(Easting + Northing),data = harvest.2015.dat)
+
+Yield1.lm <- lm(Yield ~ poly(Easting, Northing, degree=5), data=harvest.dat)
+```
+
+The response surface library `rsm` has some useful plots to help us visualize the trend surface
+
+```{r,fig.width=8,fig.height=4}
+library(rsm)
+par(mfrow=c(1,3))
+image(Yield1.lm, Northing ~ Easting)
+contour(Yield1.lm,Northing ~ Easting, image = TRUE)
+persp(Yield1.lm, Northing ~ Easting, zlab = "Yield, Poly 5")
+```
+
+
+```{r}
+#image(x=loess.dat$Easting, y=loess.dat$Northing, z=loess.dat$Yield)
+#contour(x=loess.dat$Easting, y=loess.dat$Northing, z=loess.dat$Yield, image = TRUE)
+```
+
+### B-splines
+
+Perperoglou [-@perperoglou-2019] note that the `bs` spline function in R may produce spurious results when used with 2-dimensional data.
+
+### Natural Splines
+
+
+### Generalized Additive Models
+
+`gamlss`
+
+#### `mgcv`
+ Adapted from https://stackoverflow.com/questions/16554690/interpolate-in-a-3-dimensional-spline-in-r
+```{r}
+library(mgcv)
+b1 <- gam(Yield ~ s(Easting,Northing),data=harvest.dat)
+vis.gam(b1)
+#title("t.p.r.s")
+harvest.dat$Spline <- predict(b1)
+```
+
+```{r,fig.width=8,fig.height=4}
+par(mfrow=c(1,3))
+image(b1, Northing ~ Easting)
+contour(b1,Northing ~ Easting, image = TRUE)
+persp(b1, Northing ~ Easting, zlab = "Yield, Spline")
+```
+
+```{r,fig.width=6,fig.height=4}
+ggplot(harvest.dat, aes(Easting,Northing)) + 
+geom_point(aes(colour = Spline),size=1) + 
+scale_colour_gradient2(low=vermillion, mid=yellow, high=blue,midpoint = mean(harvest.dat$Spline)) +
+#scale_colour_gradient(low=cbPalette[8], high=cbPalette[5]) +
+labs(colour = "Residuals", x="X (m)", y="Y (m)")
+```
+
+
+## model 2 with te() smooths
+```{r}
+b2 <- gam(Yield ~ te(Easting,Northing),data=harvest.dat)
+vis.gam(b2)
+#title("tensor product")
+```
+
+```{r,fig.width=8,fig.height=4}
+par(mfrow=c(1,3))
+image(b2, Northing ~ Easting)
+contour(b2,Northing ~ Easting, image = TRUE)
+persp(b2, Northing ~ Easting, zlab = "Yield, Poly 5")
+```
+
+## model 3 te() smooths specifying margin bases
+```{r}
+b3 <- gam(Yield ~ te(Easting,Northing,bs=c("tp", "tp")),data=harvest.dat)
+vis.gam(b3)
+#title("tensor product")
+```
+
+```{r,fig.width=8,fig.height=4}
+par(mfrow=c(1,3))
+image(b3, Northing ~ Easting)
+contour(b3,Northing ~ Easting, image = TRUE)
+persp(b3, Northing ~ Easting, zlab = "Yield, TE")
+```
+
+
+```{r,fig.width=8,fig.height=4}
+par(mfrow=c(1,3))
+contour(b1,Northing ~ Easting, image = TRUE)
+contour(b2,Northing ~ Easting, image = TRUE)
+contour(b3,Northing ~ Easting, image = TRUE)
+```
+
+
+See https://www.r-bloggers.com/r-as-gis-for-ecologists/ for plots
+https://www.r-bloggers.com/colored-3d-map/
+
+# References
+
+Seemingly unrelated regression
+

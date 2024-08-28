@@ -1,0 +1,43 @@
+\documentclass{article}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{amsmath}
+\usepackage{siunitx}
+
+\usepackage{{makecell}}
+\setcellgapes{3pt}\makegapedcells
+
+\usepackage{array,collcell}
+\newcommand\AddLabel[1]{%
+  \refstepcounter{equation}% increment equation counter
+  (\theequation)% print equation number
+  \label{#1}% give the equation a \label
+}
+\newcolumntype{M}{>{\hfil$\displaystyle}X<{$\hfil}} % mathematics column
+\newcolumntype{L}{>{\collectcell\AddLabel}r<{\endcollectcell}}
+
+
+\begin{document}
+
+\begin{table}[]
+ \begin{tabularx}\textwidth{@{}lML@{}}
+ \toprule
+ \textbf{Description} & \multicolumn{1}{l}{\textbf{Functional Form}}
+                              & \multicolumn{1}{l}{}\\ \midrule
+  Means model               & y_{ij}(x) = \mu_i(x) + e_{ij}(x)
+                      & FunctionMeansModel \\
+  Paired Difference    & d_j(x) = y_{1j}(x) - y_{2j}(x)
+                      & FunctionPairedDifference \\
+  Mean Difference        & \bar{d}(x) = \frac{1}{n(x)} \sum_{j=1}^n(x) d_j(x)
+                      & FunctionMeanDifference \\
+  Number of Pairs        &  n(x)
+                      & NumberofPairs \\
+  S.D. of paired differences  & S_d(x) = \sqrt{\frac{\sum_{j=1}^n(x) (d_j(x) - \bar{d(x)})^2}{n(x)-1}}
+                      & SDPairedDifferences \\
+  $t$ statistic      & t_0(x) = \frac{\bar{d}(x)}{S_d(x)/\sqrt{n(x)}}
+                      & FunctionTStatistic\\
+  \bottomrule
+  \end{tabularx}
+\end{table}
+
+ \end{document}

@@ -58,7 +58,7 @@ select.best.variogram <- function(dat, K=0, criteria='bic') {
   ResidualsData$Source <- 'Residuals'
   VariogramData$Index <- idx
   ResidualsData$Index <- idx
-  return(rbind(VariogramData,ResidualsData))
+  return(list(Data=rbind(VariogramData,ResidualsData),K=K))
   
   
   #use bic

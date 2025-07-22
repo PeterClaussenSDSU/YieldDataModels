@@ -1,4 +1,4 @@
-plot.gps.grids <- function(harvest.dat,plots,ratio=1,residuals=TRUE) {
+plot.gps.grids <- function(gps.dat,plots=0,swath.width=0, ratio=1,residuals=TRUE,valueField = "Yield") {
   
   grey <- "#999999"
   orange <- "#E69F00"
@@ -10,65 +10,72 @@ plot.gps.grids <- function(harvest.dat,plots,ratio=1,residuals=TRUE) {
   
   if(plots>0) {
     for(i in 1:1000) {
-      mask <- harvest.dat$Longitude<(i*ratio) & harvest.dat$Latitude<i
+      mask <- gps.dat$Easting<(i*ratio) & gps.dat$Northing<i
       if(sum(mask)>plots) {
         break
       }
     }
-    harvest.dat <- harvest.dat[mask,]
+    gps.dat <- gps.dat[mask,]
   }
   
-  harvest.dat$DISTANCE <- harvest.dat$DISTANCE*0.3048
-  harvest.dat$SWATHWIDTH <- harvest.dat$SWATHWIDTH*(harvest.dat$Swaths+2)*0.3048
-  
-  #harvest.dat$front <- harvest.dat$Latitude
-  #harvest.dat$rear <- harvest.dat$Latitude - harvest.dat$DISTANCE + 0.1
-  #harvest.dat$right <- harvest.dat$Longitude + harvest.dat$SWATHWIDTH/2
-  #harvest.dat$left <- harvest.dat$Longitude - harvest.dat$SWATHWIDTH/2
-  
-  if(residuals) {
-    harvest.dat$Yield <- harvest.dat$Yield - mean(harvest.dat$Yield)
+  gps.dat$DISTANCE <- gps.dat$DISTANCE*0.3048
+  if(swath.width==0) {
+    #use the monitor's swath width value
+    gps.dat$SWATHWIDTH <- gps.dat$SWATHWIDTH*(gps.dat$Swaths+2)*0.3048
+  } else {
+    gps.dat$SWATHWIDTH <- swath.width
   }
-  harvest.dat$DistanceAngle <- harvest.dat$Heading*pi/180
-  harvest.dat$DistanceRise <- cos(harvest.dat$DistanceAngle)*harvest.dat$DISTANCE
-  harvest.dat$DistanceRun <- sin(harvest.dat$DistanceAngle)*harvest.dat$DISTANCE
+
   
-  harvest.dat$SwathAngle <- (harvest.dat$Heading-90)*pi/180
-  harvest.dat$SwathRise <- cos(harvest.dat$SwathAngle)*harvest.dat$SWATHWIDTH/2
-  harvest.dat$SwathRun <- sin(harvest.dat$SwathAngle)*harvest.dat$SWATHWIDTH/2
+  #gps.dat$front <- gps.dat$Easting
+  #gps.dat$rear <- gps.dat$Easting - gps.dat$DISTANCE + 0.1
+  #gps.dat$right <- gps.dat$Northing + gps.dat$SWATHWIDTH/2
+  #gps.dat$left <- gps.dat$Northing - gps.dat$SWATHWIDTH/2
+  
+  gps.dat$Value  = gps.dat[,valueField] 
+  if(residuals) {
+    gps.dat$Value <- gps.dat$Value - mean(gps.dat$Value)
+  }
+  gps.dat$DistanceAngle <- gps.dat$Heading*pi/180
+  gps.dat$DistanceRise <- cos(gps.dat$DistanceAngle)*gps.dat$DISTANCE
+  gps.dat$DistanceRun <- sin(gps.dat$DistanceAngle)*gps.dat$DISTANCE
+  
+  gps.dat$SwathAngle <- (gps.dat$Heading-90)*pi/180
+  gps.dat$SwathRise <- cos(gps.dat$SwathAngle)*gps.dat$SWATHWIDTH/2
+  gps.dat$SwathRun <- sin(gps.dat$SwathAngle)*gps.dat$SWATHWIDTH/2
   
   if(residuals) {
-    base.plot <- ggplot(harvest.dat, aes(Longitude, Latitude)) + geom_point(aes(colour = Yield),size = 2) +
+    base.plot <- ggplot(gps.dat, aes(Easting, Northing)) + geom_point(aes(colour = Value),size = 2) +
       scale_colour_gradient2(low=vermillion, mid=yellow, high=blue)
   } else {
-    base.plot <- ggplot(harvest.dat, aes(Longitude, Latitude)) + geom_point(aes(colour = Yield),size = 2) +
+    base.plot <- ggplot(gps.dat, aes(Easting, Northing)) + geom_point(aes(colour = Value),size = 2) +
       scale_colour_gradient(low=yellow, high=bluishgreen)
   }
 
   
   #front line (left to right)
-  base.plot <- base.plot + geom_segment(aes(x = Longitude - SwathRun, 
-                                            xend = Longitude + SwathRun,
-                                            y = Latitude - SwathRise,
-                                            yend = Latitude + SwathRise), 
-                                        data = harvest.dat,color = grey,size = .5)
+  base.plot <- base.plot + geom_segment(aes(x = Easting - SwathRun, 
+                                            xend = Easting + SwathRun,
+                                            y = Northing - SwathRise,
+                                            yend = Northing + SwathRise), 
+                                        data = gps.dat,color = grey,size = .5)
   #rear line (left to right)
-  base.plot <- base.plot + geom_segment(aes(x = Longitude - SwathRun - DistanceRun, 
-                                            xend = Longitude + SwathRun - DistanceRun,
-                                            y = Latitude - DistanceRise - SwathRise,
-                                            yend = Latitude - DistanceRise + SwathRise), 
-                                        data = harvest.dat,color = skyblue,size = .3)
+  base.plot <- base.plot + geom_segment(aes(x = Easting - SwathRun - DistanceRun, 
+                                            xend = Easting + SwathRun - DistanceRun,
+                                            y = Northing - DistanceRise - SwathRise,
+                                            yend = Northing - DistanceRise + SwathRise), 
+                                        data = gps.dat,color = skyblue,size = .3)
   #right line (front to back)
-  base.plot <- base.plot + geom_segment(aes(x = Longitude + SwathRun, 
-                                            xend = Longitude + SwathRun - DistanceRun,
-                                            y = Latitude + SwathRise,
-                                            yend = Latitude + SwathRise - DistanceRise), 
-                                        data = harvest.dat,color = skyblue,size = .3)
+  base.plot <- base.plot + geom_segment(aes(x = Easting + SwathRun, 
+                                            xend = Easting + SwathRun - DistanceRun,
+                                            y = Northing + SwathRise,
+                                            yend = Northing + SwathRise - DistanceRise), 
+                                        data = gps.dat,color = skyblue,size = .3)
   #left line (front to back)
-  base.plot <- base.plot + geom_segment(aes(x = Longitude - SwathRun, 
-                                            xend = Longitude - SwathRun - DistanceRun,
-                                            y = Latitude - SwathRise,
-                                            yend = Latitude - SwathRise - DistanceRise), 
-                                        data = harvest.dat,color = skyblue,size = .3)
+  base.plot <- base.plot + geom_segment(aes(x = Easting - SwathRun, 
+                                            xend = Easting - SwathRun - DistanceRun,
+                                            y = Northing - SwathRise,
+                                            yend = Northing - SwathRise - DistanceRise), 
+                                        data = gps.dat,color = skyblue,size = .3)
   return(base.plot)
 }

@@ -7,9 +7,10 @@ spatial.model.selection <- function(data, fixed="",range=c(5,100), models=8, met
   if(method %in% c('gam','tp','te','re')) {
     require(mgcv)
   }
-  if(method %in% c('ns','bs')) {
-    require(splines)
-  }
+#  if(method %in% c('ns','bs')) {
+#    require(splines)
+#  }
+  require(splines)
   k.vec = seq(range[1],range[2],length.out=models)
   if(range[1]>=1) {
     k.vec <- round(k.vec)
@@ -21,7 +22,7 @@ spatial.model.selection <- function(data, fixed="",range=c(5,100), models=8, met
   Residuals <- vector(models+1,mode='list')
   
   tmp.var <- variogram(Yield~1, 
-                       locations=~Longitude+Latitude,
+                       locations=~Easting+Northing,
                        data=data)
   
   VariogramData <-  data.frame(Distance=tmp.var$dist,
@@ -38,7 +39,7 @@ spatial.model.selection <- function(data, fixed="",range=c(5,100), models=8, met
     ResidualI <- 1:models
   }
   
-  data.columns <- c('Longitude','Latitude','Yield')
+  data.columns <- c('Easting','Northing','Yield')
   if(fixed=="") {
     fixed <- "1"
   } else {
@@ -50,7 +51,7 @@ spatial.model.selection <- function(data, fixed="",range=c(5,100), models=8, met
   if(method %in% c('gam','tp','te','re')) {
     null.model <- gam(as.formula(fmla),data=data[,data.columns])
   } else {
-    #null.model <- lm(Yield ~ 1, data=data[,c('Longitude','Latitude','Yield')])
+    #null.model <- lm(Yield ~ 1, data=data[,c('Easting','Northing','Yield')])
     null.model <- lm(as.formula(fmla), data=data[,data.columns])
   }
   
@@ -65,38 +66,38 @@ spatial.model.selection <- function(data, fixed="",range=c(5,100), models=8, met
       tmp.dat$residuals <- tmp.dat$Yield - krig$Yield
       tmp.dat$Yield <- krig$Yield
     } else if(method=='loess') {
-      fmla <- paste('Yield ~ Longitude*Latitude +',fixed)
+      fmla <- paste('Yield ~ Easting*Northing +',fixed)
       tmp.loess <- loess(as.formula(fmla), span=k.vec[i] ,data=tmp.dat)
-      #tmp.loess <- loess(Yield ~  Longitude*Latitude, span=k.vec[i] ,data=tmp.dat)
+      #tmp.loess <- loess(Yield ~  Easting*Northing, span=k.vec[i] ,data=tmp.dat)
       Yield <- predict(tmp.loess,newdata=tmp.dat)
       tmp.dat$K = k.vec[i]
       tmp.dat$residuals <- tmp.dat$Yield - Yield
       tmp.dat$Yield <- Yield
     } else {
       if(method=='gam') {
-        fmla <- paste('Yield ~',fixed,'+ s(Longitude,Latitude,k=',k.vec[i],')')
+        fmla <- paste('Yield ~',fixed,'+ s(Easting,Northing,k=',k.vec[i],')')
         Models[[i]] <- gam(as.formula(fmla),data=tmp.dat)
-        #Models[[i]] <- gam(Yield ~ s(Longitude,Latitude,k=k.vec[i]),data=tmp.dat)
+        #Models[[i]] <- gam(Yield ~ s(Easting,Northing,k=k.vec[i]),data=tmp.dat)
         adjR2.fn <- function(x){summary(x)$r.sq}
       } else if(method=='tp'){
-        Models[[i]] <- gam(Yield ~ te(Longitude,Latitude,bs=c("tp", "tp"),k=k.vec[i]),data=tmp.dat)
+        Models[[i]] <- gam(Yield ~ te(Easting,Northing,bs=c("tp", "tp"),k=k.vec[i]),data=tmp.dat)
         adjR2.fn <- function(x){summary(x)$r.sq}
       } else if(method=='te'){
-        Models[[i]] <- gam(Yield ~ te(Longitude,Latitude,k=k.vec[i]),data=tmp.dat)
+        Models[[i]] <- gam(Yield ~ te(Easting,Northing,k=k.vec[i]),data=tmp.dat)
         adjR2.fn <- function(x){summary(x)$r.sq}
       } else if(method=='re'){
-        Models[[i]] <- gam(Yield ~ s(Longitude,Latitude,bs =c('re', 're'),k=k.vec[i]),data=tmp.dat)
+        Models[[i]] <- gam(Yield ~ s(Easting,Northing,bs =c('re', 're'),k=k.vec[i]),data=tmp.dat)
         adjR2.fn <- function(x){summary(x)$r.sq}
       } else if(method=='ns'){
-        fmla <- paste('Yield ~ ',fixed,' + ns(Longitude,df=',k.vec[i],')*ns(Latitude,df=',k.vec[i],')')
+        fmla <- paste('Yield ~ ',fixed,' + ns(Easting,df=',k.vec[i],')*ns(Northing,df=',k.vec[i],')')
        # print(fmla)
         Models[[i]] <- lm(as.formula(fmla), data=tmp.dat)
-        #Models[[i]] <- lm(Yield ~ ns(Longitude,df=k.vec[i])*ns(Latitude,df=k.vec[i]), data=tmp.dat)
+        #Models[[i]] <- lm(Yield ~ ns(Easting,df=k.vec[i])*ns(Northing,df=k.vec[i]), data=tmp.dat)
       } else if(method=='bs'){
-        fmla <- paste('Yield ~ ',fixed,'+ bs(Longitude,df=',k.vec[i],')*bs(Latitude,df=',k.vec[i],')')
+        fmla <- paste('Yield ~ ',fixed,'+ bs(Easting,df=',k.vec[i],')*bs(Northing,df=',k.vec[i],')')
         Models[[i]] <- lm(as.formula(fmla), data=tmp.dat)
       } else if(method=='lm'){
-        Models[[i]] <- lm(Yield ~ poly(Longitude,k.vec[i])*poly(Latitude,k.vec[i]), data=tmp.dat)
+        Models[[i]] <- lm(Yield ~ poly(Easting,k.vec[i])*poly(Northing,k.vec[i]), data=tmp.dat)
       }
       
       if(plot) {plot(Models[[i]])}
@@ -109,7 +110,7 @@ spatial.model.selection <- function(data, fixed="",range=c(5,100), models=8, met
     Predicted <- rbind(Predicted, tmp.dat)
     
     tmp.var <- variogram(Yield~1, 
-                           locations=~Longitude+Latitude,
+                           locations=~Easting+Northing,
                            #alpha=c(0,45,90),
                            data=tmp.dat)
     Variograms[[i+1]] <- tmp.var
@@ -121,7 +122,7 @@ spatial.model.selection <- function(data, fixed="",range=c(5,100), models=8, met
       
 
     tmp.var <- variogram(residuals~1, 
-                           locations=~Longitude+Latitude,
+                           locations=~Easting+Northing,
                            #alpha=c(0,45,90),
                            data=tmp.dat)
     ResidualsData <- rbind(ResidualsData,

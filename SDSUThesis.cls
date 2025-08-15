@@ -273,7 +273,7 @@ July\or August\or September\or October\or November\or December\fi
     \@title\\
 ~\\
     \end{center}
-    \par This {\@doctype} is approved as a cretitable and independent investigation by a candidate for the {\@degree} degree and is acceptable for meeting the {\@doctype} requirements for this degree. Acceptance of this {\@doctype} does not imply that the conclusions reached by the candidate are necessarily the conclusions of the major department.
+    \par This {\@doctype} is approved as a creditable and independent investigation by a candidate for the {\@degree} degree and is acceptable for meeting the {\@doctype} requirements for this degree. Acceptance of this {\@doctype} does not imply that the conclusions reached by the candidate are necessarily the conclusions of the major department.
     \vspace*\fill
 
     \begin{flushright}

@@ -82,7 +82,7 @@ We would like to assume isotropy - that the spatial dependency does not depend o
 ```{r}
 home.2013.var <- variogram(Yield~1, 
                           locations=~X+Y, 
-                          alpha=c(0,15,30,45,60,75,90), 
+                          alpha=c(0,90), 
                           data=home.2013.dat)
 plot(home.2013.var)
 ```

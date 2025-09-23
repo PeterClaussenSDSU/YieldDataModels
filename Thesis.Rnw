@@ -29,10 +29,12 @@
 \chapterfont{\centering\nohang\normalsize\bfseries}
 \sectionfont{\normalsize\bfseries}
 
-\title{Functional Data Analysis and Spatial Analysis for On-farm Strip Trials}
-\author{Peter Claussen}
-\docmonth{August}
-\docyear{2024}
+\title{FUNCTIONAL DATA ANALYSIS AND SPATIAL ANALYSIS FOR ON-FARM STRIP TRIALS}
+\author{PETER CLAUSSEN}
+%\degree{Ph.D.}
+%\major{Computational Science and Statistics}
+%\docmonth{August}
+\docyear{2025}
 \docadvisor{Jung-Han Kimn}    % dissertation/thesis advisor name
 \depthead{Eun Heui Kim}     % dept head name
 \dept{Mathematics \& Statistics}    % department name
@@ -50,28 +52,76 @@
 \begin{acknowledgments}
 \end{acknowledgments}
 
-\begin{abstract}
-To be written
-\end{abstract}
+\frontmatter
 
-\renewcommand{\contentsname}{Table of Contents}
+\maketitle
+
+\acceptancepage
+
+\begin{center}
+   ACKNOWLEDGMENTS
+\end{center}
+
+   Many thanks to Dr. Jung-Han Kimn for his diligent review of this material and his work with the university to help move this work forward, My gratitude to Dr. Chris Saunders for his work; I doubt I'll know all he's done to help me. Much thanks to Dr. Kurt Cogswell who helped put me on the path to this work. Finally, I'd like to thank Kyle Kepner and Margaret Kappenman with GDM Solutions for allowing me the flexibility to pursue my studies.
+   
+
+\pagebreak
+
+%\renewcommand{\contentsname}{TABLE OF CONTENTS}
+%\begin{center}
+%   TABLE OF CONTENTS
+%\end{center}
+
 \clearpage
 \phantomsection
 \pdfbookmark[0]{\contentsname}{contents}
 \tableofcontents
 
+%\clearpage
+
+%\listoftables
+
+%\clearpage
+%\listoffigures
+ 
 \clearpage
 
-\listoftables
+%\begin{center}
+%ABSTRACT
+%\end{center}
 
-\clearpage
-\listoffigures
+\addcontentsline{toc}{part}{Abstract}
+ 
+ \begin{center}
+ABSTRACT
+\end{center}
+
+\begin{center}
+FUNCTIONAL DATA ANALYSIS AND SPATIAL ANALYSIS FOR ON-FARM STRIP TRIALS
+\end{center}
+
+\begin{center}
+PETER CLAUSSEN
+\end{center}
+
+\begin{center}
+2025
+\end{center}
+
+Collaborative on-farm trials of agronomic practices have been an established method of interaction between researchers and their target audience (the farmers). With the advent of precision agriculture practices, the on-farm strip trial has become a popular method of collaborative research. Precision agriculture practices allows farmers to precisely control the application of an agronomic product or practice to specific strips in a cropland, and to leave as standard practice strips, or check strips, intermingled with the test strips.
+
+In spite of their popularity, there has been little development in the methods of analyzing strip trials. In this thesis, two examples of strip trials are considered. The first is considered an ideal case of a strip trial, where the test strips are long and narrow and together with the check strips form a uniform rectangle. With this example, methods of analyzing strips as functional data objects are developed and functional paired $t$-tests and functional trend analysis is applied. 
+
+The second example is a strip trial where the test product was applied more haphazardly and performs poorly when the strips are analyzed as functional data. To provide an analysis of these data, the trend analysis is extended to a two-dimensional spatial analysis as a method to determine the effect of the applied product.
+
 
 \mainmatter
 
+%\clearpage
+
+
 \clearpage
 \phantomsection 
-\addcontentsline{toc}{part}{Chapters}
 
 \SweaveOpts{concordance=TRUE}
 
